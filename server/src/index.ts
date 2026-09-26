@@ -14,13 +14,14 @@ const webDist =
 
 const app = createApp({
   iceServers: config.iceServers,
+  turn: config.turn,
   webDist,
   timings: { pauseMs: config.pauseMs },
 });
 
 app.http.listen(config.port, () => {
   console.log(
-    `[domino] listening on :${config.port}${webDist ? ` (serving ${webDist})` : ' (API only)'}`,
+    `[domino] listening on :${config.port}${webDist ? ` (serving ${webDist})` : ' (API only)'}${config.turn ? ' + TURN' : ''}`,
   );
 });
 

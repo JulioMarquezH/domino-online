@@ -1,6 +1,7 @@
 import { createServer, type Server as HttpServer } from 'node:http';
 import { Server } from 'socket.io';
 import type { RTCIceServerConfig, Rng } from '@domino/shared';
+import { iceServersFor } from './config';
 import type { Clock, Timings } from './room';
 import { RoomManager } from './rooms';
 import { attachSocketHandlers, createBroadcaster, type DominoServer } from './socket';
@@ -8,6 +9,7 @@ import { createStaticHandler } from './static';
 
 export interface AppOptions {
   iceServers: RTCIceServerConfig[];
+  turn?: { urls: string[]; secret: string } | null;
   webDist?: string | null;
   timings?: Partial<Timings>;
   clock?: Clock;
@@ -48,7 +50,9 @@ export function createApp(options: AppOptions): App {
     pingInterval: 10_000,
     pingTimeout: 8_000,
   }) as DominoServer;
-  attachSocketHandlers(io, rooms, options.iceServers);
+  attachSocketHandlers(io, rooms, (id) =>
+    iceServersFor({ iceServers: options.iceServers, turn: options.turn ?? null }, id),
+  );
 
   return {
     http,

@@ -53,7 +53,7 @@ export function createBroadcaster(getIo: () => DominoServer) {
 export function attachSocketHandlers(
   io: DominoServer,
   manager: RoomManager,
-  iceServers: RTCIceServerConfig[],
+  iceServersFor: (playerId: string) => RTCIceServerConfig[],
 ): void {
   io.on('connection', (socket: DominoSocket) => {
     socket.data.roomId = null;
@@ -116,7 +116,13 @@ export function attachSocketHandlers(
       }
       socket.data.roomId = room.id;
       socket.data.playerId = player.id;
-      reply({ ok: true, roomId: room.id, playerId: player.id, token: player.token, iceServers });
+      reply({
+        ok: true,
+        roomId: room.id,
+        playerId: player.id,
+        token: player.token,
+        iceServers: iceServersFor(player.id),
+      });
     };
 
     socket.on('room:create', (p, ack) => {
