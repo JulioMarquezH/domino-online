@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch --clear-screen=false src/index.ts",
+    "dev": "PORT=${SERVER_PORT:-3001} tsx watch --clear-screen=false src/index.ts",
     "build": "esbuild src/index.ts --bundle --platform=node --target=node22 --format=esm --packages=external --alias:@domino/shared=../shared/src/index.ts --outfile=dist/index.js",
     "start": "NODE_ENV=production node dist/index.js"
   },

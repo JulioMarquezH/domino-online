@@ -585,7 +585,11 @@ export class Room {
       version: this.version,
       draw:
         this.phase === 'draw' && this.draw
-          ? { picks: this.draw.picks.map((p) => ({ ...p })), outcome: this.draw.outcome }
+          ? {
+              mode: this.draw.mode,
+              picks: this.draw.picks.map((p) => ({ ...p })),
+              outcome: this.draw.outcome,
+            }
           : null,
       game:
         inHand && match

@@ -58,6 +58,8 @@ export interface DrawPickView {
 }
 
 export interface DrawView {
+  /** 'sortear': the draw also makes the teams; 'starter': teams are fixed, it only picks who leads. */
+  mode: 'sortear' | 'starter';
   picks: DrawPickView[];
   /** Set once all four have picked. */
   outcome: {
@@ -161,6 +163,8 @@ export interface RTCIceServerConfig {
 export interface SignalPayload {
   description?: { type: string; sdp?: string };
   candidate?: unknown;
+  /** Ask the peer to drop the connection and start a fresh one (after a hard failure). */
+  reset?: boolean;
 }
 
 export interface ClientToServerEvents {

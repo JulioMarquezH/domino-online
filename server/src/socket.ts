@@ -10,6 +10,7 @@ import {
   type JoinOk,
   type RTCIceServerConfig,
   type ServerToClientEvents,
+  type SignalPayload,
 } from '@domino/shared';
 import type { Server, Socket } from 'socket.io';
 import { isValidToken, type Result, type Room } from './room';
@@ -240,7 +241,7 @@ export function attachSocketHandlers(
       io.to(target.socketId).emit('rtc:signal', {
         from: s.playerId,
         fromSession: socket.id,
-        data: data as { description?: { type: string; sdp?: string }; candidate?: unknown },
+        data: data as SignalPayload,
       });
     });
 
