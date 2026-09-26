@@ -23,8 +23,14 @@ document.addEventListener(
   { passive: false },
 );
 
-if (import.meta.env.DEV) {
-  // Debug hooks for local end-to-end checks.
+let debug = false;
+try {
+  debug = localStorage.getItem('domino:debug') === '1';
+} catch {
+  // storage blocked
+}
+if (import.meta.env.DEV || debug) {
+  // Debug hooks for end-to-end checks (they only expose this client's own state).
   Object.assign(window, { __domino: { voice, state: getClientState } });
 }
 

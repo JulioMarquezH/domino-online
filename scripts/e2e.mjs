@@ -1,6 +1,7 @@
 /**
  * End-to-end check with 4 real browser contexts (Playwright + Chrome's fake mic).
  * Run `npm run dev` first, then `npm run e2e`. Screenshots go to e2e-artifacts/.
+ * Against a deployed build: BASE_URL=https://… npm run e2e
  *
  *   E2E_PAUSE=1      also runs the full 2-minute disconnection pause ("Esperar más")
  *   E2E_HEADFUL=1    shows the browsers
@@ -69,6 +70,7 @@ for (const [i, name] of NAMES.entries()) {
     ...(i === 3 ? phone : desktop),
     permissions: ['microphone'],
   });
+  await context.addInitScript(() => localStorage.setItem('domino:debug', '1'));
   const page = await context.newPage();
   page.on('pageerror', (e) => log(`${name} pageerror`, e.message));
   players.push({ name, context, page });
@@ -377,6 +379,7 @@ while ((await view(ana)).phase !== 'matchEnd') {
     await ana.page.getByText('ocupará su puesto').waitFor();
     await shot(ana, '07b-replacement-open');
     const context = await browser.newContext({ ...desktop, permissions: ['microphone'] });
+    await context.addInitScript(() => localStorage.setItem('domino:debug', '1'));
     const page = await context.newPage();
     await page.goto(`${BASE}/sala/${roomId}`);
     await page.getByLabel('Tu nombre').fill('Eva');
