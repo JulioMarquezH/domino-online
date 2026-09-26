@@ -1,0 +1,21 @@
+{
+  "name": "@domino/server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false src/index.ts",
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node22 --format=esm --packages=external --alias:@domino/shared=../shared/src/index.ts --outfile=dist/index.js",
+    "start": "NODE_ENV=production node dist/index.js"
+  },
+  "dependencies": {
+    "socket.io": "^4.8.4"
+  },
+  "devDependencies": {
+    "@domino/shared": "*",
+    "@types/node": "^24.0.0",
+    "esbuild": "^0.28.2",
+    "socket.io-client": "^4.8.4",
+    "tsx": "^4.23.15"
+  }
+}

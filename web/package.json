@@ -1,0 +1,27 @@
+{
+  "name": "@domino/web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:https": "HTTPS=1 vite --host",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@domino/shared": "*",
+    "@fontsource-variable/dm-sans": "^5.3.0",
+    "@fontsource-variable/fraunces": "^5.3.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "socket.io-client": "^4.8.4"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-basic-ssl": "^2.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "vite": "^8.3.1"
+  }
+}
