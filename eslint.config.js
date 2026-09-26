@@ -28,8 +28,13 @@ export default tseslint.config(
     },
   },
   {
-    files: ['server/**/*.ts', 'scripts/**/*.{js,mjs}', '*.config.{js,ts}'],
+    files: ['server/**/*.ts', '*.config.{js,ts}'],
     languageOptions: { globals: globals.node },
+  },
+  {
+    // Playwright scripts: Node, plus browser code inside page.evaluate().
+    files: ['scripts/**/*.{js,mjs}'],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
   {
     files: ['web/**/*.{ts,tsx}'],
