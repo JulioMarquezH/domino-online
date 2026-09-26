@@ -1,0 +1,10 @@
+{
+  "name": "Dominó",
+  "short_name": "Dominó",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0b2a21",
+  "theme_color": "#0b2a21",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
