@@ -158,6 +158,22 @@ log('voice: 6 connections, all "connected" on the 4 clients');
 await shot(ana, '01-lobby');
 await shot(players[3], '01-lobby-phone');
 
+// ── manual seats: everybody sits, then the host goes back to "Sortear" ──
+await ana.page.getByRole('radio', { name: 'Elegir asientos' }).click();
+for (const [i, p] of players.entries()) {
+  await p.page.locator('.seat').nth(i).waitFor();
+  await p.page.locator(`.seat-${['bottom', 'right', 'top', 'left'][i]}`).click();
+}
+await until(
+  async () => (await view(ana)).players.every((p) => p.seat !== null),
+  5000,
+  'all seated',
+);
+await ana.page.getByRole('button', { name: 'Empezar' }).isEnabled();
+await shot(ana, '01b-lobby-manual');
+log('manual mode: all four picked a seat');
+await ana.page.getByRole('radio', { name: 'Sortear' }).click();
+
 // ── host starts; interactive starter draw ──
 await ana.page.getByRole('radio', { name: '100' }).click();
 await ana.page.getByRole('button', { name: 'Empezar' }).click();
@@ -274,6 +290,7 @@ async function finishHandSummary() {
 }
 
 let reloaded = false;
+let replaced = false;
 let paused = !process.env.E2E_PAUSE;
 let tookBoardShot = false;
 let checkedPhone = false;
@@ -327,7 +344,10 @@ while ((await view(ana)).phase !== 'matchEnd') {
     await ana.page.getByRole('button', { name: 'Esperar más' }).waitFor({ timeout: 135000 });
     await shot(ana, '07-host-decides');
     await ana.page.getByRole('button', { name: 'Esperar más' }).click();
-    await ana.page.getByText('1:5').first().waitFor();
+    await ana.page
+      .getByText(/^(2:00|1:5\d)$/)
+      .first()
+      .waitFor();
     log('host chose "Esperar más": countdown restarted');
     caro.page = await caro.context.newPage();
     await caro.page.goto(`${BASE}/sala/${roomId}`);
@@ -336,6 +356,50 @@ while ((await view(ana)).phase !== 'matchEnd') {
     log('Caro came back: game resumed');
     paused = true;
     void host;
+  }
+  // Nobody comes back: the host lets a newcomer take the seat, with its hand and team.
+  if (
+    paused &&
+    process.env.E2E_PAUSE &&
+    !replaced &&
+    v.game.handNumber >= 3 &&
+    v.game.line.length >= 4
+  ) {
+    const dani = players[3];
+    const before = await view(dani);
+    const seat = seatOf(before);
+    const count = before.game.hand.length;
+    await dani.context.close();
+    await ana.page.getByText('Dani se desconectó, esperando…').waitFor();
+    log('Dani disconnected; waiting 2 minutes…');
+    await ana.page.getByRole('button', { name: 'Permitir reemplazo' }).waitFor({ timeout: 135000 });
+    await ana.page.getByRole('button', { name: 'Permitir reemplazo' }).click();
+    await ana.page.getByText('ocupará su puesto').waitFor();
+    await shot(ana, '07b-replacement-open');
+    const context = await browser.newContext({ ...desktop, permissions: ['microphone'] });
+    const page = await context.newPage();
+    await page.goto(`${BASE}/sala/${roomId}`);
+    await page.getByLabel('Tu nombre').fill('Eva');
+    await page.getByRole('button', { name: 'Entrar a la sala' }).click();
+    await page.locator('.table-screen').waitFor();
+    const eva = await until(
+      async () =>
+        (await page.evaluate(() => window.__domino.state().view))?.game
+          ? page.evaluate(() => window.__domino.state().view)
+          : null,
+      10000,
+      'eva view',
+    );
+    if (seatOf(eva) !== seat || eva.game.hand.length !== count)
+      throw new Error('replacement did not inherit the seat');
+    await until(
+      async () => (await view(ana)).pause.length === 0,
+      10000,
+      'resume after replacement',
+    );
+    players[3] = { name: 'Eva', context, page };
+    log(`Eva replaced Dani: same seat (${seat}) and ${count} tiles; game resumed`);
+    replaced = true;
   }
   if (!tookBoardShot && v.game.line.length >= 14) {
     await shot(ana, '04-table');
@@ -387,7 +451,7 @@ for (let i = 1; i < starters.length; i++) {
 }
 log(`starter rotated to the right every hand: ${starters.join(' → ')}`);
 await shot(ana, '08-match-end');
-await shot(players[3], '08-match-end-phone');
+if (players[3].name === 'Dani') await shot(players[3], '08-match-end-phone');
 
 // ── rematch keeping the teams ──
 const seatsBefore = (await view(ana)).players.map((p) => `${p.name}:${p.seat}`).join(',');
@@ -403,10 +467,24 @@ if (re.players.map((p) => `${p.name}:${p.seat}`).join(',') !== seatsBefore)
   throw new Error('teams changed');
 log('Revancha: new draw, same teams, scores 0-0');
 
-// ── portrait overlay on the phone ──
-await players[3].page.setViewportSize({ width: 390, height: 844 });
-await players[3].page.getByRole('heading', { name: 'Gira tu teléfono' }).waitFor();
-await shot(players[3], '09-portrait-overlay');
+// ── portrait overlay on a phone ──
+{
+  const p = players[3].name === 'Dani' ? players[3].page : null;
+  const page = p ?? (await (await browser.newContext({ ...phone })).newPage());
+  if (!p) {
+    // Dani was replaced: open the (portrait) room on a fresh phone with Eva's token copied over.
+    const token = await players[3].page.evaluate(
+      (id) => localStorage.getItem(`domino:room:${id}`),
+      roomId,
+    );
+    await page.goto(BASE);
+    await page.evaluate(([id, t]) => localStorage.setItem(`domino:room:${id}`, t), [roomId, token]);
+    await page.goto(`${BASE}/sala/${roomId}`);
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('heading', { name: 'Gira tu teléfono' }).waitFor();
+  await page.screenshot({ path: `${OUT}/09-portrait-overlay.png` });
+}
 log('portrait → "Gira tu teléfono" overlay');
 
 await browser.close();

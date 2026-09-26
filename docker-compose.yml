@@ -1,0 +1,20 @@
+services:
+  domino:
+    build: .
+    image: domino-online:latest
+    container_name: domino
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PORT: 3000
+    # Only reachable through Caddy on the same host.
+    ports:
+      - '127.0.0.1:8020:3000'
+    mem_limit: 192m
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: '2'
