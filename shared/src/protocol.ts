@@ -112,7 +112,7 @@ export interface RoomView {
   players: PublicPlayer[];
   target: Target;
   teamMode: TeamMode;
-  /** Increments on every game state change; actions must echo it (stale actions are rejected). */
+  /** Increments on every game state change; plays and passes must echo it (stale ones are rejected). */
   version: number;
   draw: DrawView | null;
   game: GameView | null;
@@ -174,10 +174,10 @@ export interface ClientToServerEvents {
   'lobby:mode': (p: { mode: TeamMode }, ack: (r: Ack) => void) => void;
   'lobby:sit': (p: { seat: Seat | null }, ack: (r: Ack) => void) => void;
   'lobby:start': (ack: (r: Ack) => void) => void;
-  'draw:pick': (p: { position: number; v: number }, ack: (r: Ack) => void) => void;
+  'draw:pick': (p: { position: number }, ack: (r: Ack) => void) => void;
   'game:play': (p: { tile: TileId; end: End; v: number }, ack: (r: Ack) => void) => void;
   'game:pass': (p: { v: number }, ack: (r: Ack) => void) => void;
-  'hand:ready': (p: { v: number }, ack: (r: Ack) => void) => void;
+  'hand:ready': (ack: (r: Ack) => void) => void;
   'pause:decide': (
     p: { playerId: string; decision: 'wait' | 'end' | 'replace' },
     ack: (r: Ack) => void,
