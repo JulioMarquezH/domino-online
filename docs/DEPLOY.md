@@ -3,12 +3,19 @@
 Destino: el droplet de DigitalOcean que ya sirve Manhattan (Ubuntu 24.04, 1 vCPU / 1 GB RAM +
 2 GB de swap, Docker, Caddy con HTTPS automático). Subdominio: **domino.manhattan-project.online**.
 
-Estado al 2026-09-26:
+Estado al 2026-09-26 (desplegado):
 
-- DNS: `domino.manhattan-project.online` ya resuelve a `137.184.155.4`. Si alguna vez deja de
-  resolver: en Namecheap, registro `A`, host `domino`, valor `137.184.155.4`.
-- El repo está clonado en `/opt/domino` y la imagen `domino-online:latest` ya está construida ahí.
-- Falta: arrancar el contenedor, añadir el bloque de Caddy y (recomendado) coturn.
+- En producción en **https://domino.137-184-155-4.sslip.io** (nombre temporal de sslip.io que
+  resuelve a la IP del droplet; Caddy saca el certificado solo).
+- `domino.manhattan-project.online` **aún no existe en el DNS**: falta crear en Namecheap el
+  registro `A`, host `domino`, valor `137.184.155.4`. El bloque de Caddy ya está puesto; en cuanto
+  el registro propague, Caddy obtiene el certificado y ese dominio funciona sin tocar nada más.
+  Luego se puede quitar el bloque de sslip.io del Caddyfile.
+- Contenedor `domino` en `127.0.0.1:8020` (repo en `/opt/domino`), ~25 MB de RAM.
+- coturn activo (`/etc/turnserver.conf`, secreto en `/opt/domino/.turn_secret`), UFW abierto en
+  3478/udp+tcp y 49160–49359/udp; `/opt/domino/.env` le pasa `TURN_URLS`/`TURN_SECRET` al
+  contenedor. Verificado con un enlace forzado a `relay`.
+- Respaldo del Caddyfile anterior en `/etc/caddy/Caddyfile.bak-*`.
 
 ## 1. Contenedor
 
