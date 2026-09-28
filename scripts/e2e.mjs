@@ -212,6 +212,9 @@ let moveCount = 0;
 let checkedIllegal = false;
 let checkedPassDisabled = false;
 let usedDrag = 0;
+let boardDrops = 0;
+let checkedCancel = false;
+let checkedBadge = false;
 
 async function playOneMove() {
   const views = await Promise.all(players.map(view));
@@ -226,6 +229,13 @@ async function playOneMove() {
   const p = players[idx];
   const v = views[idx];
   const moves = legal(v.game.hand, v.game.line);
+  if (!checkedBadge) {
+    await p.page.locator('.turn-badge.mine').waitFor({ timeout: 3000 });
+    const other = players[(idx + 1) % 4];
+    await other.page.getByText(`Juega ${p.name}`).waitFor({ timeout: 3000 });
+    checkedBadge = true;
+    log(`turn badge: "${p.name}" sees "¡Te toca!", ${other.name} sees "Juega ${p.name}"`);
+  }
   const passBtn = p.page.getByRole('button', { name: 'Pasar' });
 
   if (moves.length === 0) {
@@ -264,7 +274,23 @@ async function playOneMove() {
       await p.page.mouse.move(from.x + from.width / 2 + 10, from.y - 20, { steps: 3 });
       const target = p.page.locator(`[data-end-target="${move.end}"]`);
       await target.waitFor();
-      const to = await target.boundingBox();
+      if (!checkedCancel) {
+        // A gesture the browser cancels mid-drag must not leave the hand stuck.
+        await p.page.evaluate(() => window.dispatchEvent(new Event('blur')));
+        await p.page.mouse.up();
+        if (await p.page.locator('.drag-ghost').count()) throw new Error('drag ghost stuck');
+        await p.page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+        await p.page.mouse.down();
+        await p.page.mouse.move(from.x + from.width / 2 + 10, from.y - 20, { steps: 3 });
+        checkedCancel = true;
+        log(`${p.name}: cancelled drag released cleanly, next drag works`);
+      }
+      let to = await target.boundingBox();
+      if (usedDrag % 2 === 1) {
+        // Dropped anywhere on the felt: it goes to the end it fits.
+        to = await p.page.locator('.board').boundingBox();
+        boardDrops++;
+      }
       await p.page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 8 });
       await p.page.mouse.up();
       usedDrag++;
@@ -469,6 +495,39 @@ while ((await view(ana)).phase !== 'matchEnd') {
     }
     log(`phone 844×390: ${m.tiles} tiles inside the board, no scrolling`);
     await shot(players[3], '04b-table-phone-full');
+    // Same phone with the browser bars showing (much less height).
+    await dani.setViewportSize({ width: 750, height: 300 });
+    await new Promise((r) => setTimeout(r, 900));
+    const short = await dani.evaluate(() => {
+      const board = document.querySelector('.board').getBoundingClientRect();
+      const tiles = [...document.querySelectorAll('.board-tile')].map((t) =>
+        t.getBoundingClientRect(),
+      );
+      const inside = tiles.every(
+        (r) =>
+          r.left >= board.left - 1 &&
+          r.right <= board.right + 1 &&
+          r.top >= board.top - 1 &&
+          r.bottom <= board.bottom + 1,
+      );
+      const hand = document.querySelector('.hand').getBoundingClientRect();
+      const pass = document.querySelector('.pass-btn').getBoundingClientRect();
+      return {
+        noScroll:
+          document.documentElement.scrollHeight <= innerHeight &&
+          document.documentElement.scrollWidth <= innerWidth,
+        inside,
+        hand: hand.bottom <= innerHeight && hand.left >= 0 && hand.right <= innerWidth,
+        pass: pass.bottom <= innerHeight && pass.right <= innerWidth,
+        boardH: Math.round(board.height),
+      };
+    });
+    await shot(players[3], '04c-table-phone-short');
+    if (!short.noScroll || !short.inside || !short.hand || !short.pass) {
+      throw new Error(`short phone layout broken ${JSON.stringify(short)}`);
+    }
+    log(`phone 750×300 (browser bars visible): everything fits, board ${short.boardH}px tall`);
+    await dani.setViewportSize({ width: 844, height: 390 });
     checkedPhone = true;
   }
   await playOneMove();
@@ -476,7 +535,7 @@ while ((await view(ana)).phase !== 'matchEnd') {
 
 const end = await view(ana);
 log(
-  `match over: team ${end.matchWinner} wins ${end.game.scores.join('-')} (target ${end.target}), ${moveCount} moves, ${usedDrag} by drag`,
+  `match over: team ${end.matchWinner} wins ${end.game.scores.join('-')} (target ${end.target}), ${moveCount} moves, ${usedDrag} by drag (${boardDrops} dropped on the felt)`,
 );
 for (let i = 1; i < starters.length; i++) {
   if (starters[i] !== (starters[i - 1] + 1) % 4)
