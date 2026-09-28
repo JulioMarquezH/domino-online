@@ -71,6 +71,13 @@ function PauseRow({
             >
               Esperar más
             </button>
+            <button
+              type="button"
+              className="btn secondary"
+              onClick={() => void actions.decide(entry.playerId, 'bot')}
+            >
+              Que juegue la IA
+            </button>
             {!entry.replaceable && (
               <button
                 type="button"

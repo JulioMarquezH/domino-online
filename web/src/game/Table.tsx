@@ -210,7 +210,7 @@ export function Table({ view }: { view: RoomView }) {
               positionOf={d.position}
             />
             <Announcer message={announcement} />
-            {turnPos && (
+            {turnPos && !myTurn && (
               <div
                 className={`turn-badge at-${turnPos} ${myTurn ? 'mine' : ''}`}
                 aria-live="polite"
@@ -241,7 +241,7 @@ export function Table({ view }: { view: RoomView }) {
         <div className="cell c-bottom-left">
           <div className={`self-seat ${myTurn ? 'is-turn' : ''}`}>
             {d.me && <Avatar player={d.me} team={d.myTeam} isSelf active={myTurn} />}
-            <span className="self-label">{myTurn ? 'Te toca' : 'Tú'}</span>
+            <span className="self-label">{myTurn ? '¡Te toca!' : 'Tú'}</span>
           </div>
         </div>
         <div className="cell c-bottom">

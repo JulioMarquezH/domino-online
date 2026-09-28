@@ -90,6 +90,20 @@ export const RotatePhoneIcon = (p: P) => (
   </Svg>
 );
 
+export const BotIcon = (p: P) => (
+  <Svg {...p}>
+    <rect x="4" y="8" width="16" height="11" rx="3" />
+    <path d="M12 4v4M9 13h.01M15 13h.01M9.5 16.5h5" />
+    <circle cx="12" cy="3.5" r="1" fill="currentColor" />
+  </Svg>
+);
+
+export const PlusIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="M12 5v14M5 12h14" />
+  </Svg>
+);
+
 export const ExpandIcon = (p: P) => (
   <Svg {...p}>
     <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />

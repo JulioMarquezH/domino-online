@@ -749,3 +749,17 @@
     width: 52px;
   }
 }
+
+.tag-bot {
+  background: rgba(125, 190, 242, 0.16);
+  color: #b9dcff;
+}
+
+.player-row.empty .empty-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.add-bot {
+  flex: none;
+}

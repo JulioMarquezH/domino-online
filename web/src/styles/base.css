@@ -438,24 +438,35 @@ p {
   position: absolute;
   display: grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
+  width: 17px;
+  height: 17px;
   border-radius: 50%;
   border: 1.5px solid var(--bg-1);
 }
 
 .badge-host {
-  top: -6px;
-  right: -6px;
+  top: -7px;
+  right: -7px;
   background: var(--brass);
   color: #2a1a05;
 }
 
 .badge-mic {
-  bottom: -5px;
-  right: -5px;
+  bottom: -7px;
+  right: -7px;
   background: #3a1612;
   color: #ffb3a6;
+}
+
+.badge-bot {
+  bottom: -7px;
+  right: -7px;
+  background: #16324a;
+  color: #b9dcff;
+}
+
+.avatar.is-bot {
+  background: radial-gradient(circle at 35% 30%, #eef6ff, #c3d3e6 70%, #93a8c2);
 }
 
 .badge-novoice {

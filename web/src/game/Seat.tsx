@@ -48,12 +48,13 @@ export function Seat({ player, position, isTurn, isPartner, dealKey, passedAt }:
           team={team}
           isSelf={false}
           active={isTurn}
-          onClick={() => setOpen((o) => !o)}
+          onClick={player.isBot ? undefined : () => setOpen((o) => !o)}
         />
         <div className="seat-text">
           <span className="seat-name">{player.name}</span>
           <span className={`seat-role team-text-${team ?? 'none'}`}>
             {isPartner ? 'Pareja' : 'Rival'}
+            {player.isBot && ' · IA'}
             {isTurn && <span className="turn-dots" aria-label="está jugando" />}
           </span>
         </div>

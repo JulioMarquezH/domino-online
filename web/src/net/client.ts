@@ -151,11 +151,13 @@ export const actions = {
   setMode: (mode: 'sortear' | 'manual') => emitAck('lobby:mode', { mode }),
   sit: (seat: number | null) => emitAck('lobby:sit', { seat }),
   start: () => emitAck('lobby:start'),
+  addBot: () => emitAck('lobby:addBot'),
+  removeBot: (playerId: string) => emitAck('lobby:removeBot', { playerId }),
   pick: (position: number) => emitAck('draw:pick', { position }),
   play: (tile: string, end: 'left' | 'right', v: number) => emitAck('game:play', { tile, end, v }),
   pass: (v: number) => emitAck('game:pass', { v }),
   ready: () => emitAck('hand:ready'),
-  decide: (playerId: string, decision: 'wait' | 'end' | 'replace') =>
+  decide: (playerId: string, decision: 'wait' | 'end' | 'replace' | 'bot') =>
     emitAck('pause:decide', { playerId, decision }),
   rematch: (keepTeams: boolean) => emitAck('match:rematch', { keepTeams }),
 };

@@ -12,7 +12,7 @@ import { navigate, roomUrl } from '../net/router';
 import { derive } from '../game/derive';
 import { Avatar } from '../ui/Avatar';
 import { useCopied } from '../ui/hooks';
-import { CheckIcon, DoorIcon, LinkIcon } from '../ui/icons';
+import { CheckIcon, DoorIcon, LinkIcon, PlusIcon } from '../ui/icons';
 import { MicNotice } from '../ui/MicNotice';
 import { PeerVoiceControl, SelfMicButton } from '../ui/VoiceControls';
 import { voiceStatusText } from '../voice/status';
@@ -30,7 +30,7 @@ export function Lobby({ view }: { view: RoomView }) {
   const canStart = missing === 0 && (!manual || unseated === 0);
   const hint =
     missing > 0
-      ? `Faltan ${missing} ${missing === 1 ? 'jugador' : 'jugadores'}. Comparte el enlace.`
+      ? `Faltan ${missing} ${missing === 1 ? 'jugador' : 'jugadores'}. Comparte el enlace${isHost ? ' o agrega IA' : ''}.`
       : manual && unseated > 0
         ? 'Todos deben elegir asiento.'
         : 'Todo listo.';
@@ -81,12 +81,27 @@ export function Lobby({ view }: { view: RoomView }) {
           </h2>
           <ul className="player-list">
             {view.players.map((p) => (
-              <PlayerRow key={p.id} player={p} isSelf={p.id === view.youId} manual={manual} />
+              <PlayerRow
+                key={p.id}
+                player={p}
+                isSelf={p.id === view.youId}
+                manual={manual}
+                canRemove={isHost && p.isBot}
+              />
             ))}
             {Array.from({ length: MAX_PLAYERS - view.players.length }, (_, i) => (
               <li key={`empty-${i}`} className="player-row empty">
                 <span className="avatar avatar-md team-none ghost-avatar" />
-                <span className="muted">Esperando jugador…</span>
+                <span className="muted empty-text">Esperando jugador…</span>
+                {isHost && (
+                  <button
+                    type="button"
+                    className="btn secondary small add-bot"
+                    onClick={() => void actions.addBot()}
+                  >
+                    <PlusIcon size={16} /> Agregar IA
+                  </button>
+                )}
               </li>
             ))}
           </ul>
@@ -173,10 +188,12 @@ function PlayerRow({
   player,
   isSelf,
   manual,
+  canRemove,
 }: {
   player: PublicPlayer;
   isSelf: boolean;
   manual: boolean;
+  canRemove: boolean;
 }) {
   const v = useVoice();
   const team = manual && player.seat !== null ? teamOf(player.seat) : null;
@@ -187,13 +204,24 @@ function PlayerRow({
         <span className="player-name">
           <span className="name-text">{player.name}</span>
           {isSelf && <span className="tag">tú</span>}
+          {player.isBot && <span className="tag tag-bot">IA</span>}
           {player.isHost && <span className="tag tag-host">anfitrión</span>}
         </span>
         <span className="player-status">
           {voiceStatusText(player, isSelf, v.peers[player.id]?.conn, v.mic)}
         </span>
       </div>
-      {!isSelf && player.connected && <PeerVoiceControl player={player} />}
+      {!isSelf && !player.isBot && player.connected && <PeerVoiceControl player={player} />}
+      {canRemove && (
+        <button
+          type="button"
+          className="btn ghost small"
+          onClick={() => void actions.removeBot(player.id)}
+          aria-label={`Quitar a ${player.name}`}
+        >
+          Quitar
+        </button>
+      )}
     </li>
   );
 }

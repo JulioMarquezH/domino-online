@@ -498,7 +498,21 @@
 }
 
 .self-seat.is-turn .self-label {
-  color: var(--brass-hi);
+  color: #2a1a05;
+  background: linear-gradient(180deg, var(--brass-hi), var(--brass) 60%, #b88b3c);
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: clamp(0.85rem, 4dvh, 1.15rem);
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+  white-space: nowrap;
+  box-shadow:
+    0 0 0 3px rgba(243, 217, 151, 0.3),
+    0 0 22px rgba(243, 217, 151, 0.55);
+  animation: badge-bob 1.6s ease-in-out infinite;
 }
 
 .hand {
@@ -1123,13 +1137,6 @@
   transform: scale(1.12);
 }
 
-.is-my-turn .self-label {
-  color: #2a1a05;
-  background: var(--brass-hi);
-  padding: 1px 8px;
-  border-radius: 999px;
-}
-
 .has-turn:not(.is-my-turn) .hand {
   opacity: 0.8;
 }
@@ -1233,6 +1240,10 @@
   .self-label {
     font-size: 0.62rem;
   }
+  .self-seat.is-turn .self-label {
+    font-size: 0.92rem;
+    padding: 2px 10px;
+  }
   .rail {
     padding: 5px;
     border-radius: 14px;
@@ -1243,7 +1254,12 @@
   .table-screen .seat-role {
     display: none;
   }
-  .table-screen .self-label {
+  .table-screen .self-seat:not(.is-turn) .self-label {
     display: none;
   }
+}
+
+.seat-slot.is-turn.pos-left .seat-text,
+.seat-slot.is-turn.pos-right .seat-text {
+  margin-top: 4px;
 }
