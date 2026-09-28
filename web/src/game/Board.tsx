@@ -10,6 +10,8 @@ interface Props {
   showTargets: boolean;
   hoverEnd: End | null;
   onTarget: (end: End) => void;
+  /** A tap on the felt (not on a target), in client coordinates. */
+  onBoardTap: (x: number, y: number) => void;
   positionOf: (seat: Seat) => ScreenPosition;
 }
 
@@ -21,7 +23,15 @@ const ENTER_FROM: Record<ScreenPosition, [number, number]> = {
 };
 
 /** The felt with the snake of played tiles, auto-scaled to always fit. */
-export function Board({ line, origin, showTargets, hoverEnd, onTarget, positionOf }: Props) {
+export function Board({
+  line,
+  origin,
+  showTargets,
+  hoverEnd,
+  onTarget,
+  onBoardTap,
+  positionOf,
+}: Props) {
   const [ref, size] = useElementSize<HTMLDivElement>();
   // Row width depends only on the board's shape, so tiles never jump during a hand.
   const qw = Math.round(size.w / 16);
@@ -45,7 +55,15 @@ export function Board({ line, origin, showTargets, hoverEnd, onTarget, positionO
   });
 
   return (
-    <div className="board" ref={ref} data-unit={unit.toFixed(1)}>
+    <div
+      className="board"
+      ref={ref}
+      data-unit={unit.toFixed(1)}
+      onClick={(e) => {
+        if (!(e.target as HTMLElement).closest('[data-end-target]'))
+          onBoardTap(e.clientX, e.clientY);
+      }}
+    >
       <div className="snake-layer">
         {size.w > 0 &&
           layout.tiles.map((t) => {
@@ -85,7 +103,10 @@ export function Board({ line, origin, showTargets, hoverEnd, onTarget, positionO
               type="button"
               className={`end-target ${hoverEnd === t.end ? 'hover' : ''}`}
               style={boxStyle(t.cx, t.cy, t.angle)}
-              onClick={() => onTarget(t.end)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onTarget(t.end);
+              }}
               data-end-target={t.end}
               data-pip={ends ?? ''}
               aria-label={

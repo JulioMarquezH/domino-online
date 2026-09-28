@@ -2,6 +2,7 @@ import {
   canPass,
   fitsEnd,
   partnerOf,
+  playableEnds,
   type End,
   type RoomView,
   type Seat as SeatNo,
@@ -13,18 +14,17 @@ import { actions, leaveRoom } from '../net/client';
 import { navigate } from '../net/router';
 import { Avatar } from '../ui/Avatar';
 import { DoorIcon, SpeakerIcon, SpeakerOffIcon } from '../ui/icons';
-import { tryLandscape } from '../ui/landscape';
+import { FullscreenButton } from '../ui/FullscreenButton';
+import { autoFullscreen } from '../ui/landscape';
 import { SelfMicButton } from '../ui/VoiceControls';
 import { Announcer, type Announcement } from './Announcer';
 import { Board } from './Board';
 import { derive } from './derive';
-import { Hand } from './Hand';
+import { Hand, type DropSpot } from './Hand';
 import { HandSummary } from './HandSummary';
 import { MatchEnd } from './MatchEnd';
 import { Scoreboard } from './Scoreboard';
 import { Seat } from './Seat';
-
-let triedLandscape = false;
 
 export function Table({ view }: { view: RoomView }) {
   const d = derive(view);
@@ -72,7 +72,10 @@ export function Table({ view }: { view: RoomView }) {
     lineLen.current = line.length;
   }, [line.length]);
   useEffect(() => {
-    if (myTurn && !wasMyTurn.current) sfx.turn();
+    if (myTurn && !wasMyTurn.current) {
+      sfx.turn();
+      navigator.vibrate?.([70, 50, 70]);
+    }
     wasMyTurn.current = myTurn;
   }, [myTurn]);
   useEffect(() => {
@@ -101,6 +104,37 @@ export function Table({ view }: { view: RoomView }) {
     else doShake(tile);
   };
 
+  /**
+   * A tile dropped (or a selected tile tapped) anywhere on the table: play it on the end it
+   * fits; if it fits both, on the end closest to the finger. A tile that fits nowhere shakes.
+   */
+  const playOnBoard = (tile: TileId, x: number | null, y: number | null) => {
+    const ends = playableEnds(tile, g.line);
+    if (ends.length === 0) {
+      doShake(tile);
+      return;
+    }
+    let end = ends[0] as End;
+    if (ends.length > 1 && x !== null && y !== null) {
+      let best = Infinity;
+      document.querySelectorAll<HTMLElement>('[data-end-target]').forEach((el) => {
+        const r = el.getBoundingClientRect();
+        const dist = Math.hypot(x - (r.left + r.width / 2), y - (r.top + r.height / 2));
+        const e = el.dataset.endTarget as End;
+        if (ends.includes(e) && dist < best) {
+          best = dist;
+          end = e;
+        }
+      });
+    }
+    void attempt(tile, end);
+  };
+
+  const onDrop = (tile: TileId, spot: DropSpot) => {
+    if (spot.kind === 'end') void attempt(tile, spot.end);
+    else playOnBoard(tile, spot.x, spot.y);
+  };
+
   const pass = async () => {
     if (!canPassNow || pending) return;
     setPending(true);
@@ -115,16 +149,12 @@ export function Table({ view }: { view: RoomView }) {
   const partner = partnerOf(mySeat);
   const turnIs = (seat: SeatNo | null | undefined) =>
     view.phase === 'playing' && seat !== null && seat !== undefined && g.turn === seat;
+  const turnPos = view.phase === 'playing' && !paused ? d.position(g.turn) : null;
 
   return (
     <div
-      className="screen table-screen felt game-screen"
-      onPointerDownCapture={() => {
-        if (!triedLandscape) {
-          triedLandscape = true;
-          void tryLandscape();
-        }
-      }}
+      className={`screen table-screen felt game-screen ${myTurn ? 'is-my-turn' : ''} ${turnPos ? 'has-turn' : ''}`}
+      onPointerUpCapture={autoFullscreen}
     >
       <div className="table-grid">
         <div className="cell c-top-left">
@@ -165,7 +195,7 @@ export function Table({ view }: { view: RoomView }) {
           )}
         </div>
         <div className="cell c-center">
-          <div className="rail">
+          <div className={`rail ${turnPos ? `turn-${turnPos}` : ''}`}>
             <Board
               line={g.line}
               origin={g.origin}
@@ -174,9 +204,26 @@ export function Table({ view }: { view: RoomView }) {
               onTarget={(end) => {
                 if (selectedTile) void attempt(selectedTile, end);
               }}
+              onBoardTap={(x, y) => {
+                if (selectedTile && myTurn) playOnBoard(selectedTile, x, y);
+              }}
               positionOf={d.position}
             />
             <Announcer message={announcement} />
+            {turnPos && (
+              <div
+                className={`turn-badge at-${turnPos} ${myTurn ? 'mine' : ''}`}
+                aria-live="polite"
+              >
+                {myTurn ? (
+                  '¡Te toca!'
+                ) : (
+                  <>
+                    Juega <strong>{d.nameAt(g.turn)}</strong>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
         <div className="cell c-right">
@@ -194,7 +241,7 @@ export function Table({ view }: { view: RoomView }) {
         <div className="cell c-bottom-left">
           <div className={`self-seat ${myTurn ? 'is-turn' : ''}`}>
             {d.me && <Avatar player={d.me} team={d.myTeam} isSelf active={myTurn} />}
-            <span className="self-label">{myTurn ? 'Tu turno' : 'Tú'}</span>
+            <span className="self-label">{myTurn ? 'Te toca' : 'Tú'}</span>
           </div>
         </div>
         <div className="cell c-bottom">
@@ -205,7 +252,7 @@ export function Table({ view }: { view: RoomView }) {
             dealKey={g.handNumber}
             myTurn={myTurn}
             onSelect={setSelected}
-            onDrop={(tile, end) => void attempt(tile, end)}
+            onDrop={onDrop}
             onDragChange={(tile, hover) => {
               setDragTile(tile);
               setHoverEnd(hover);
@@ -235,6 +282,7 @@ function TableControls() {
   const [confirmLeave, setConfirmLeave] = useState(false);
   return (
     <div className="table-controls">
+      <FullscreenButton />
       <SelfMicButton compact />
       <button
         type="button"

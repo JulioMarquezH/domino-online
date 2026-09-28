@@ -3,6 +3,9 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 import { createPortal } from 'react-dom';
 import { TileFace } from '../ui/Tile';
 
+/** Where a dragged tile was released: on an end target, or anywhere on the board. */
+export type DropSpot = { kind: 'end'; end: End } | { kind: 'board'; x: number; y: number };
+
 interface Props {
   tiles: TileId[];
   selected: TileId | null;
@@ -10,7 +13,7 @@ interface Props {
   dealKey: number;
   myTurn: boolean;
   onSelect: (tile: TileId | null) => void;
-  onDrop: (tile: TileId, end: End) => void;
+  onDrop: (tile: TileId, spot: DropSpot) => void;
   onDragChange: (dragging: TileId | null, hover: End | null) => void;
 }
 
@@ -46,7 +49,18 @@ function endAt(x: number, y: number): End | null {
   return (best as { end: End; d: number } | null)?.end ?? null;
 }
 
-/** Your tiles: tap to select, or drag onto an end. Nothing hints which ones are playable. */
+function overBoard(x: number, y: number): boolean {
+  const board = document.querySelector('.board');
+  if (!board) return false;
+  const r = board.getBoundingClientRect();
+  return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+}
+
+/**
+ * Your tiles: tap to select, or drag onto the table. Nothing hints which ones are playable.
+ * Drags are tracked with window listeners attached on pointerdown, so a lost pointerup
+ * (browser gesture, element re-render…) can never leave the hand stuck.
+ */
 export function Hand({
   tiles,
   selected,
@@ -60,15 +74,41 @@ export function Hand({
   const [drag, setDrag] = useState<Drag | null>(null);
   const dragRef = useRef<Drag | null>(null);
   const hoverRef = useRef<End | null>(null);
+  const detachRef = useRef<(() => void) | null>(null);
+  const props = useRef({ selected, onSelect, onDrop, onDragChange });
 
   useEffect(() => {
-    dragRef.current = drag;
-  }, [drag]);
+    props.current = { selected, onSelect, onDrop, onDragChange };
+  });
+
+  // Never leave listeners behind.
+  useEffect(() => () => detachRef.current?.(), []);
+
+  const end = (x: number | null, y: number | null, cancelled: boolean) => {
+    const d = dragRef.current;
+    detachRef.current?.();
+    detachRef.current = null;
+    dragRef.current = null;
+    hoverRef.current = null;
+    setDrag(null);
+    if (!d) return;
+    const p = props.current;
+    if (d.active) p.onDragChange(null, null);
+    if (cancelled || x === null || y === null) return;
+    if (!d.active) {
+      p.onSelect(p.selected === d.tile ? null : d.tile);
+      return;
+    }
+    const target = endAt(x, y);
+    if (target) p.onDrop(d.tile, { kind: 'end', end: target });
+    else if (overBoard(x, y)) p.onDrop(d.tile, { kind: 'board', x, y });
+  };
 
   const onPointerDown = (e: ReactPointerEvent<HTMLButtonElement>, tile: TileId) => {
-    if (e.button !== 0 || dragRef.current) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    // A previous gesture that never finished is discarded instead of blocking the hand.
+    if (dragRef.current) end(null, null, true);
     const r = e.currentTarget.getBoundingClientRect();
-    e.currentTarget.setPointerCapture(e.pointerId);
     const d: Drag = {
       tile,
       pointerId: e.pointerId,
@@ -82,37 +122,39 @@ export function Hand({
     };
     dragRef.current = d;
     setDrag(d);
-  };
 
-  const onPointerMove = (e: ReactPointerEvent<HTMLButtonElement>) => {
-    const d = dragRef.current;
-    if (!d || d.pointerId !== e.pointerId) return;
-    const moved = Math.hypot(e.clientX - d.startX, e.clientY - d.startY) > DRAG_THRESHOLD;
-    const next = { ...d, x: e.clientX, y: e.clientY, active: d.active || moved };
-    dragRef.current = next;
-    setDrag(next);
-    if (next.active) {
-      const hover = endAt(e.clientX, e.clientY);
-      if (!d.active || hover !== hoverRef.current) {
-        hoverRef.current = hover;
-        onDragChange(next.tile, hover);
+    const move = (ev: PointerEvent) => {
+      const cur = dragRef.current;
+      if (!cur || ev.pointerId !== cur.pointerId) return;
+      const moved = Math.hypot(ev.clientX - cur.startX, ev.clientY - cur.startY) > DRAG_THRESHOLD;
+      const next = { ...cur, x: ev.clientX, y: ev.clientY, active: cur.active || moved };
+      dragRef.current = next;
+      setDrag(next);
+      if (next.active) {
+        const hover = endAt(ev.clientX, ev.clientY);
+        if (!cur.active || hover !== hoverRef.current) {
+          hoverRef.current = hover;
+          props.current.onDragChange(next.tile, hover);
+        }
       }
-    }
-  };
-
-  const finish = (e: ReactPointerEvent<HTMLButtonElement>, cancelled: boolean) => {
-    const d = dragRef.current;
-    if (!d || d.pointerId !== e.pointerId) return;
-    dragRef.current = null;
-    setDrag(null);
-    hoverRef.current = null;
-    onDragChange(null, null);
-    if (!d.active) {
-      if (!cancelled) onSelect(selected === d.tile ? null : d.tile);
-      return;
-    }
-    const end = cancelled ? null : endAt(e.clientX, e.clientY);
-    if (end) onDrop(d.tile, end);
+    };
+    const up = (ev: PointerEvent) => {
+      if (ev.pointerId === dragRef.current?.pointerId) end(ev.clientX, ev.clientY, false);
+    };
+    const cancel = (ev: PointerEvent) => {
+      if (ev.pointerId === dragRef.current?.pointerId) end(null, null, true);
+    };
+    const blur = () => end(null, null, true);
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', cancel);
+    window.addEventListener('blur', blur);
+    detachRef.current = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', cancel);
+      window.removeEventListener('blur', blur);
+    };
   };
 
   return (
@@ -135,9 +177,7 @@ export function Hand({
             aria-pressed={selected === tile}
             aria-label={`Ficha ${hi} ${lo}`}
             onPointerDown={(e) => onPointerDown(e, tile)}
-            onPointerMove={onPointerMove}
-            onPointerUp={(e) => finish(e, false)}
-            onPointerCancel={(e) => finish(e, true)}
+            onContextMenu={(e) => e.preventDefault()}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
