@@ -41,6 +41,8 @@ export type MicState = 'on' | 'muted' | 'off';
 export interface PublicPlayer {
   id: string;
   name: string;
+  /** Played by the server's AI. */
+  isBot: boolean;
   seat: Seat | null;
   connected: boolean;
   isHost: boolean;
@@ -128,6 +130,12 @@ export interface RoomView {
   matchWinner: Team | null;
 }
 
+/** What the host can do once a disconnected player's 2 minutes are up. */
+export type PauseDecision = 'wait' | 'end' | 'replace' | 'bot';
+
+export const MAX_BOTS = 3;
+export const BOT_NAMES = ['Rosa', 'Tomás', 'Lucho', 'Marta', 'Chepe', 'Nena', 'Toño', 'Chela'];
+
 export type JoinErrorCode = 'NOT_FOUND' | 'FULL' | 'NAME_TAKEN' | 'NAME_INVALID' | 'NEED_NAME';
 export type ActionErrorCode =
   | 'NOT_IN_ROOM'
@@ -178,14 +186,13 @@ export interface ClientToServerEvents {
   'lobby:mode': (p: { mode: TeamMode }, ack: (r: Ack) => void) => void;
   'lobby:sit': (p: { seat: Seat | null }, ack: (r: Ack) => void) => void;
   'lobby:start': (ack: (r: Ack) => void) => void;
+  'lobby:addBot': (ack: (r: Ack) => void) => void;
+  'lobby:removeBot': (p: { playerId: string }, ack: (r: Ack) => void) => void;
   'draw:pick': (p: { position: number }, ack: (r: Ack) => void) => void;
   'game:play': (p: { tile: TileId; end: End; v: number }, ack: (r: Ack) => void) => void;
   'game:pass': (p: { v: number }, ack: (r: Ack) => void) => void;
   'hand:ready': (ack: (r: Ack) => void) => void;
-  'pause:decide': (
-    p: { playerId: string; decision: 'wait' | 'end' | 'replace' },
-    ack: (r: Ack) => void,
-  ) => void;
+  'pause:decide': (p: { playerId: string; decision: PauseDecision }, ack: (r: Ack) => void) => void;
   'match:rematch': (p: { keepTeams: boolean }, ack: (r: Ack) => void) => void;
   'voice:mic': (p: { mic: MicState }) => void;
   'rtc:signal': (p: { to: string; toSession: string; data: SignalPayload }) => void;

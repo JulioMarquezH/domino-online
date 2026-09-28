@@ -41,6 +41,16 @@ export type HandResult =
       hands: TileId[][];
     };
 
+/** Public record of the hand: every player at the table sees it happen. */
+export interface HistoryEntry {
+  seat: Seat;
+  kind: 'play' | 'pass';
+  tile?: TileId;
+  end?: End;
+  /** Open ends right before the action (null on the lead). */
+  ends: [number, number] | null;
+}
+
 export interface HandState {
   /** Remaining tiles, indexed by seat. */
   hands: TileId[][];
@@ -51,6 +61,7 @@ export interface HandState {
   starter: Seat;
   turn: Seat;
   result: HandResult | null;
+  history: HistoryEntry[];
 }
 
 export type Action = { type: 'play'; tile: TileId; end?: End } | { type: 'pass' };
@@ -77,7 +88,7 @@ export type ActionOutcome<S> =
 export function dealHand(rng: Rng, starter: Seat): HandState {
   const deck = shuffle(fullSet(), rng);
   const hands = SEATS.map((s) => deck.slice(s * TILES_PER_HAND, (s + 1) * TILES_PER_HAND));
-  return { hands, line: [], origin: 0, starter, turn: starter, result: null };
+  return { hands, line: [], origin: 0, starter, turn: starter, result: null, history: [] };
 }
 
 /** [leftPip, rightPip] of the open ends, or null when nothing has been played. */
@@ -185,7 +196,11 @@ export function applyHandAction(
     if (!canPass(hand, state.line)) return { ok: false, error: 'CANNOT_PASS' };
     return {
       ok: true,
-      state: { ...state, turn: nextSeat(seat) },
+      state: {
+        ...state,
+        turn: nextSeat(seat),
+        history: [...state.history, { seat, kind: 'pass', ends: openEnds(state.line) }],
+      },
       events: [{ type: 'pass', seat }],
     };
   }
@@ -237,6 +252,7 @@ export function applyHandAction(
       starter: state.starter,
       turn: result ? seat : nextSeat(seat),
       result,
+      history: [...state.history, { seat, kind: 'play', tile, end, ends: openEnds(state.line) }],
     },
     events,
   };

@@ -4,4 +4,5 @@ export * from './seats';
 export * from './draw';
 export * from './hand';
 export * from './match';
+export * from './ai';
 export * from './protocol';

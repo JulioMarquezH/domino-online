@@ -24,7 +24,7 @@ function lineWithEnds(left: number, right: number, filler: TileId[] = []): Place
 }
 
 function state(hands: TileId[][], line: PlacedTile[], turn: Seat): HandState {
-  return { hands, line, origin: 0, starter: 0, turn, result: null };
+  return { hands, line, origin: 0, starter: 0, turn, result: null, history: [] };
 }
 
 describe('dealing', () => {
