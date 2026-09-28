@@ -28,4 +28,6 @@ export const storage = {
   clearToken: (roomId: string) => write(roomKey(roomId), null),
   getSound: () => read(SOUND_KEY) !== 'off',
   setSound: (on: boolean) => write(SOUND_KEY, on ? 'on' : 'off'),
+  getFlag: (name: string) => read(`domino:flag:${name}`) === '1',
+  setFlag: (name: string) => write(`domino:flag:${name}`, '1'),
 };

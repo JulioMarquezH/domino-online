@@ -1,5 +1,5 @@
 import { ExpandIcon, RotatePhoneIcon } from './icons';
-import { canLockLandscape, tryLandscape } from './landscape';
+import { canFullscreen, enterFullscreen, isTouch } from './landscape';
 
 /** Shown in portrait during the game (CSS decides when). */
 export function RotateOverlay() {
@@ -10,8 +10,8 @@ export function RotateOverlay() {
       </div>
       <h2>Gira tu teléfono</h2>
       <p>La mesa se juega en horizontal.</p>
-      {canLockLandscape() && (
-        <button type="button" className="btn secondary" onClick={() => void tryLandscape()}>
+      {isTouch() && canFullscreen() && (
+        <button type="button" className="btn secondary" onClick={() => void enterFullscreen()}>
           <ExpandIcon size={18} /> Pantalla completa
         </button>
       )}

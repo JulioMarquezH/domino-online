@@ -11,7 +11,7 @@ import { unlockAudio } from '../audio/context';
 import { sfx } from '../audio/sfx';
 import { actions } from '../net/client';
 import { Avatar } from '../ui/Avatar';
-import { tryLandscape } from '../ui/landscape';
+import { autoFullscreen } from '../ui/landscape';
 import { TileBack, TileFace } from '../ui/Tile';
 import { derive } from './derive';
 
@@ -33,7 +33,7 @@ export function DrawScreen({ view }: { view: RoomView }) {
 
   const pick = async (position: number) => {
     unlockAudio();
-    void tryLandscape();
+    autoFullscreen();
     if (myPick || pending !== null || byPosition.has(position) || view.pause.length > 0) return;
     setPending(position);
     const res = await actions.pick(position);

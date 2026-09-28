@@ -10,6 +10,8 @@ import { unlockAudio } from '../audio/context';
 import { createRoom } from '../net/client';
 import { navigate, roomPath } from '../net/router';
 import { storage } from '../net/storage';
+import { InstallSteps } from '../ui/FullscreenButton';
+import { isIOS, isStandalone } from '../ui/landscape';
 import { TileFace } from '../ui/Tile';
 
 const ALLOWED = new RegExp(`[^${ROOM_ID_ALPHABET}]`, 'g');
@@ -21,6 +23,9 @@ export function Home() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const cleanName = sanitizeName(name);
+  const [showTip, setShowTip] = useState(
+    () => isIOS() && !isStandalone() && !storage.getFlag('ios-tip'),
+  );
 
   const onCreate = async () => {
     unlockAudio();
@@ -130,6 +135,21 @@ export function Home() {
           <p className="form-error" role="alert">
             {error}
           </p>
+        )}
+        {showTip && (
+          <div className="install-tip">
+            <InstallSteps />
+            <button
+              type="button"
+              className="btn ghost small"
+              onClick={() => {
+                storage.setFlag('ios-tip');
+                setShowTip(false);
+              }}
+            >
+              Entendido
+            </button>
+          </div>
         )}
       </main>
     </div>
