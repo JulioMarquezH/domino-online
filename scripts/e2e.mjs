@@ -230,7 +230,7 @@ async function playOneMove() {
   const v = views[idx];
   const moves = legal(v.game.hand, v.game.line);
   if (!checkedBadge) {
-    await p.page.locator('.turn-badge.mine').waitFor({ timeout: 3000 });
+    await p.page.locator('.self-seat.is-turn', { hasText: '¡Te toca!' }).waitFor({ timeout: 3000 });
     const other = players[(idx + 1) % 4];
     await other.page.getByText(`Juega ${p.name}`).waitFor({ timeout: 3000 });
     checkedBadge = true;

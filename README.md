@@ -31,6 +31,19 @@ Son las reglas de Julio, **no** las "estándar":
   queda **0–0** y se sigue con la siguiente.
 - Gana la partida la primera pareja en llegar a la meta: **100**, 150 o 200.
 
+## Jugar con la IA
+
+En la sala, el anfitrión puede pulsar **Agregar IA** en los puestos vacíos: se juega 3 personas
+
+- 1 IA, 2 + 2, o 1 persona contra 3 IAs. Si llega un amigo a una sala llena, ocupa el puesto de
+  una IA. Si alguien se desconecta en plena partida, el anfitrión puede elegir **Que juegue la IA**
+  por él (misma mano, misma pareja); al volver, esa persona recupera su puesto.
+
+La IA juega limpio: solo usa lo que sabe un jugador en la mesa (sus fichas, lo que está jugado,
+cuántas fichas tiene cada uno y quién pasó con qué números). Con eso imagina muchos repartos
+posibles de las fichas ocultas, simula cada jugada candidata hasta el final de la mano y elige la
+que en promedio da más puntos a su pareja (`shared/src/ai.ts`).
+
 ## Correr en local
 
 Requisitos: Node 24 (ver `.nvmrc`).
@@ -52,6 +65,7 @@ Socket.IO.
 | `npm run build`     | Build del web y bundle del servidor                |
 | `npm start`         | Producción: un solo puerto sirve web + Socket.IO   |
 | `npm run e2e`       | Partida completa con 4 navegadores (ver abajo)     |
+| `npm run e2e:bots`  | Una persona contra 3 IAs, por la interfaz          |
 
 Variables de entorno del servidor (ver `.env.example`): `PORT`, `ICE_SERVERS` (JSON con
 servidores STUN/TURN; por defecto solo el STUN público de Google) y, opcionalmente, `TURN_URLS` +
@@ -75,6 +89,10 @@ npm run dev               # en una terminal
 npm run e2e               # en otra; capturas en e2e-artifacts/
 E2E_PAUSE=1 npm run e2e   # incluye las pausas reales de 2 minutos y el reemplazo
 ```
+
+En el teléfono conviene jugar a pantalla completa: en Android se activa sola al primer toque (o
+con el botón ⛶); en iPhone, Safari no lo permite, así que hay que usar **Compartir → Agregar a
+inicio** y abrir Dominó desde ese ícono.
 
 ## Probar desde el teléfono (misma Wi-Fi)
 
