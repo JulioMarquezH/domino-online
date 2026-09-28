@@ -5,12 +5,11 @@ Destino: el droplet de DigitalOcean que ya sirve Manhattan (Ubuntu 24.04, 1 vCPU
 
 Estado al 2026-09-26 (desplegado):
 
-- En producción en **https://domino.137-184-155-4.sslip.io** (nombre temporal de sslip.io que
-  resuelve a la IP del droplet; Caddy saca el certificado solo).
-- `domino.manhattan-project.online` **aún no existe en el DNS**: falta crear en Namecheap el
-  registro `A`, host `domino`, valor `137.184.155.4`. El bloque de Caddy ya está puesto; en cuanto
-  el registro propague, Caddy obtiene el certificado y ese dominio funciona sin tocar nada más.
-  Luego se puede quitar el bloque de sslip.io del Caddyfile.
+- En producción en **https://domino.manhattan-project.online** (registro `A` `domino` →
+  `137.184.155.4` creado en Namecheap el 2026-09-28; certificado de Let's Encrypt emitido por
+  Caddy, se renueva solo).
+- También responde **https://domino.137-184-155-4.sslip.io**, el nombre temporal que se usó antes
+  de tener el registro DNS. Se puede quitar ese bloque del Caddyfile cuando ya no haga falta.
 - Contenedor `domino` en `127.0.0.1:8020` (repo en `/opt/domino`), ~25 MB de RAM.
 - coturn activo (`/etc/turnserver.conf`, secreto en `/opt/domino/.turn_secret`), UFW abierto en
   3478/udp+tcp y 49160–49359/udp; `/opt/domino/.env` le pasa `TURN_URLS`/`TURN_SECRET` al

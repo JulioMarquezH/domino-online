@@ -54,6 +54,8 @@ const browser = await chromium.launch({
     '--use-fake-device-for-media-stream',
     `--use-file-for-fake-audio-capture=${wav}`,
     '--autoplay-policy=no-user-gesture-required',
+    // Extra Chrome flags, e.g. E2E_ARGS='--host-resolver-rules=MAP example.com 1.2.3.4'
+    ...(process.env.E2E_ARGS ? [process.env.E2E_ARGS] : []),
   ],
 });
 
@@ -411,7 +413,15 @@ while ((await view(ana)).phase !== 'matchEnd') {
   }
   if (!checkedPhone && v.game.line.length >= 18) {
     const dani = players[3].page;
-    const m = await dani.evaluate(() => {
+    const m = await dani.evaluate(async () => {
+      // Let the fly-in / zoom transitions settle before measuring.
+      await Promise.all(
+        document
+          .getAnimations()
+          .filter((a) => a.effect?.getTiming().iterations !== Infinity)
+          .map((a) => a.finished.catch(() => undefined)),
+      );
+      await new Promise((r) => setTimeout(r, 650));
       const board = document.querySelector('.board').getBoundingClientRect();
       const tiles = [...document.querySelectorAll('.board-tile')].map((t) =>
         t.getBoundingClientRect(),
@@ -431,6 +441,26 @@ while ((await view(ana)).phase !== 'matchEnd') {
         h: innerHeight,
         inside,
         tiles: tiles.length,
+        outside: tiles
+          .filter(
+            (r) =>
+              r.left < board.left - 1 ||
+              r.right > board.right + 1 ||
+              r.top < board.top - 1 ||
+              r.bottom > board.bottom + 1,
+          )
+          .map((r) => [
+            Math.round(r.left),
+            Math.round(r.top),
+            Math.round(r.right),
+            Math.round(r.bottom),
+          ]),
+        board: [
+          Math.round(board.left),
+          Math.round(board.top),
+          Math.round(board.right),
+          Math.round(board.bottom),
+        ],
         handInView: hand.bottom <= innerHeight && hand.right <= innerWidth && hand.left >= 0,
       };
     });
