@@ -901,6 +901,7 @@
 .decide-row {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: center;
   gap: 8px;
 }
@@ -1386,5 +1387,252 @@
   }
   .label-short {
     display: inline;
+  }
+}
+
+/* ───────────── hand result: who won, and each pair's tiles ───────────── */
+.summary-card,
+.match-card {
+  width: min(780px, 100%);
+}
+
+.verdict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 14px;
+}
+
+.verdict-title {
+  font-size: clamp(1.45rem, 7dvh, 2.3rem);
+  font-style: italic;
+  line-height: 1.1;
+}
+
+.verdict-title.tie {
+  color: var(--ink);
+}
+
+.points-pill {
+  padding: 4px 14px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: clamp(0.9rem, 3.6dvh, 1.1rem);
+  color: #1b1307;
+  background: var(--ink-2);
+  white-space: nowrap;
+}
+
+.points-pill.team-0 {
+  background: var(--team-0);
+}
+
+.points-pill.team-1 {
+  background: var(--team-1);
+}
+
+.verdict-explain {
+  color: var(--ink-2);
+  font-size: clamp(0.8rem, 3.2dvh, 0.95rem);
+  max-width: 56ch;
+  margin: 0 auto;
+}
+
+.breakdown {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: stretch;
+  text-align: left;
+}
+
+.team-panel {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 16px;
+  background: rgba(255, 244, 214, 0.04);
+  border: 1px solid rgba(245, 237, 219, 0.1);
+}
+
+.team-panel.team-0 {
+  --team: var(--team-0);
+}
+
+.team-panel.team-1 {
+  --team: var(--team-1);
+}
+
+.team-panel.winner {
+  border-color: var(--team);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--team) 16%, transparent), transparent 70%),
+    rgba(255, 244, 214, 0.04);
+  box-shadow: 0 0 22px color-mix(in srgb, var(--team) 25%, transparent);
+}
+
+.team-panel.loser {
+  opacity: 0.92;
+}
+
+.team-panel.loser footer span {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.team-panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.team-name {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--team);
+}
+
+.win-badge {
+  padding: 1px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #1b1307;
+  background: var(--team);
+}
+
+.team-panel ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  align-content: start;
+}
+
+.team-panel li {
+  display: grid;
+  grid-template-columns: minmax(48px, 30%) 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.bd-name {
+  font-weight: 650;
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bd-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-height: 20px;
+  align-items: center;
+}
+
+.bd-tiles em {
+  color: var(--ink-3);
+  font-size: 0.82rem;
+}
+
+.bd-pips {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+}
+
+.team-panel footer {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-top: 5px;
+  border-top: 1px solid rgba(245, 237, 219, 0.1);
+  font-size: 0.8rem;
+  color: var(--ink-2);
+}
+
+.team-panel footer strong {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.bd-vs {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 2px;
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+  font-size: 0.95rem;
+}
+
+.breakdown.is-tranque .bd-vs {
+  color: var(--ink);
+  font-size: 1.2rem;
+}
+
+.bd-sign {
+  font-size: 1.4rem;
+  color: var(--brass-hi);
+  line-height: 1;
+}
+
+.last-hand {
+  display: grid;
+  gap: 8px;
+}
+
+.last-hand-title {
+  font-size: 0.88rem;
+  color: var(--ink-2);
+}
+
+.last-hand-title strong {
+  color: var(--ink);
+}
+
+/* Narrow screens: pairs stacked, the comparison between them. */
+@media (max-width: 620px) {
+  .breakdown {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bd-vs {
+    grid-auto-flow: column;
+    gap: 10px;
+  }
+}
+
+@media (max-height: 430px) {
+  .summary-card,
+  .match-card {
+    gap: 6px;
+  }
+  .team-panel {
+    padding: 6px 8px;
+    gap: 4px;
+  }
+  .team-panel footer strong {
+    font-size: 1.1rem;
+  }
+  .reveal-tile {
+    --rh: 20px;
+  }
+  .final-value {
+    font-size: clamp(1.6rem, 10dvh, 2.6rem);
+  }
+  .match-card .big-title {
+    font-size: 1.35rem;
   }
 }

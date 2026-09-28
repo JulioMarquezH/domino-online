@@ -1,6 +1,6 @@
 import { applyHandAction, dealHand, legalMoves, mulberry32, type HandState } from '@domino/shared';
 import { describe, expect, it } from 'vitest';
-import { chooseLimit, layoutSnake, type TileBox } from './layout';
+import { GAP, chooseLimit, layoutSnake, type TileBox } from './layout';
 
 function overlaps(a: TileBox, b: TileBox): boolean {
   const eps = 1e-9;
@@ -25,7 +25,30 @@ function randomLines(seed: number): HandState[] {
   return states;
 }
 
+/** Distance between two boxes' edges (0 when they touch or overlap). */
+function separation(a: TileBox, b: TileBox): number {
+  const gx = Math.abs(a.cx - b.cx) - (a.w + b.w) / 2;
+  const gy = Math.abs(a.cy - b.cy) - (a.h + b.h) / 2;
+  return Math.max(gx, gy);
+}
+
 describe('snake layout', () => {
+  it('never lets two tiles touch: there is always a gap, also at corners and between rows', () => {
+    for (let seed = 1; seed <= 80; seed++) {
+      for (const limit of [5, 8, 11, 14]) {
+        const states = randomLines(seed);
+        const { tiles } = layoutSnake(states[states.length - 1] as HandState, limit);
+        for (let i = 0; i < tiles.length; i++) {
+          for (let j = i + 1; j < tiles.length; j++) {
+            expect(separation(tiles[i] as TileBox, tiles[j] as TileBox)).toBeGreaterThanOrEqual(
+              GAP - 1e-9,
+            );
+          }
+        }
+      }
+    }
+  });
+
   it('never overlaps tiles and faces matching pips toward each other', () => {
     for (let seed = 1; seed <= 60; seed++) {
       for (const limit of [5, 8, 11, 14]) {

@@ -1,9 +1,10 @@
 import type { RoomView, Team } from '@domino/shared';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { actions, leaveRoom } from '../net/client';
 import { navigate } from '../net/router';
-import { derive, resultLine, resultTitle } from './derive';
-import { Reveal } from './HandSummary';
+import { derive } from './derive';
+import { HandBreakdown } from './HandBreakdown';
+import { verdictOf } from './verdict';
 
 export function MatchEnd({ view }: { view: RoomView }) {
   const d = derive(view);
@@ -11,7 +12,8 @@ export function MatchEnd({ view }: { view: RoomView }) {
   const winner = view.matchWinner;
   const [busy, setBusy] = useState(false);
   if (!g || winner === null) return null;
-  const loser: Team = winner === 0 ? 1 : 0;
+  // Your pair first, like in the hand breakdown.
+  const order: Team[] = d.myTeam === 1 ? [1, 0] : [0, 1];
   const weWon = d.myTeam === winner;
   const isHost = d.me?.isHost ?? false;
   const rematch = async (keepTeams: boolean) => {
@@ -27,60 +29,65 @@ export function MatchEnd({ view }: { view: RoomView }) {
           {weWon ? '¡Ganamos!' : `Ganaron ${d.teamNames(winner)}`}
         </h2>
         <div className="final-score">
-          <div className={`final team-${winner}`}>
-            <span className="final-label">{d.teamLabel(winner)}</span>
-            <span className="final-value">{g.scores[winner]}</span>
-            <span className="final-names">{d.teamNames(winner)}</span>
-          </div>
-          <span className="final-sep">—</span>
-          <div className={`final team-${loser}`}>
-            <span className="final-label">{d.teamLabel(loser)}</span>
-            <span className="final-value">{g.scores[loser]}</span>
-            <span className="final-names">{d.teamNames(loser)}</span>
-          </div>
+          {order.map((t, i) => (
+            <Fragment key={t}>
+              {i === 1 && <span className="final-sep">—</span>}
+              <div className={`final team-${t} ${t === winner ? 'is-winner' : ''}`}>
+                <span className="final-label">
+                  {d.teamLabel(t)}
+                  {t === winner && ' · ganan'}
+                </span>
+                <span className="final-value">{g.scores[t]}</span>
+                <span className="final-names">{d.teamNames(t)}</span>
+              </div>
+            </Fragment>
+          ))}
         </div>
         {view.handResult && (
-          <details className="last-hand">
-            <summary>
-              Última mano: {resultTitle(view.handResult, d)} {resultLine(view.handResult, d)}
-            </summary>
-            <Reveal result={view.handResult} d={d} />
-          </details>
-        )}
-        {isHost ? (
-          <div className="rematch-row">
-            <button
-              type="button"
-              className="btn primary"
-              disabled={busy}
-              onClick={() => void rematch(true)}
-            >
-              Revancha · mismas parejas
-            </button>
-            <button
-              type="button"
-              className="btn secondary"
-              disabled={busy}
-              onClick={() => void rematch(false)}
-            >
-              Revancha · sortear parejas
-            </button>
+          <div className="last-hand">
+            <p className="last-hand-title">
+              Última mano · {verdictOf(view.handResult, d).kicker}{' '}
+              <strong>{verdictOf(view.handResult, d).points}</strong>
+            </p>
+            <HandBreakdown result={view.handResult} d={d} />
           </div>
-        ) : (
-          <p className="muted">
-            Esperando a que {d.host?.name ?? 'el anfitrión'} pida la revancha…
-          </p>
         )}
-        <button
-          type="button"
-          className="btn ghost small"
-          onClick={() => {
-            leaveRoom();
-            navigate('/');
-          }}
-        >
-          Salir de la sala
-        </button>
+        <div className="rematch-row">
+          {isHost ? (
+            <>
+              <button
+                type="button"
+                className="btn primary"
+                disabled={busy}
+                onClick={() => void rematch(true)}
+              >
+                Revancha · mismas parejas
+              </button>
+              <button
+                type="button"
+                className="btn secondary"
+                disabled={busy}
+                onClick={() => void rematch(false)}
+              >
+                Revancha · sortear parejas
+              </button>
+            </>
+          ) : (
+            <p className="muted">
+              Esperando a que {d.host?.name ?? 'el anfitrión'} pida la revancha…
+            </p>
+          )}
+          <button
+            type="button"
+            className="btn ghost small"
+            onClick={() => {
+              leaveRoom();
+              navigate('/');
+            }}
+          >
+            Salir de la sala
+          </button>
+        </div>
       </div>
     </div>
   );

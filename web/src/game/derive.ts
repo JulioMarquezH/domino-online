@@ -1,5 +1,4 @@
 import {
-  type HandResultView,
   screenPosition,
   seatsOfTeam,
   teamOf,
@@ -39,6 +38,8 @@ export function derive(view: RoomView): Derived {
       myTeam === null ? `Pareja ${team + 1}` : team === myTeam ? 'Nosotros' : 'Ellos',
     teamNames: (team) =>
       seatsOfTeam(team)
+        .slice()
+        .sort((a, b) => (a === mySeat ? -1 : b === mySeat ? 1 : 0))
         .map((s) => (s === mySeat ? 'Tú' : nameAt(s)))
         .join(' y '),
     nameAt,
@@ -52,21 +53,4 @@ export function formatClock(ms: number): string {
   const m = Math.floor(total / 60);
   const s = total % 60;
   return `${m}:${String(s).padStart(2, '0')}`;
-}
-
-export function resultTitle(r: HandResultView, d: Derived): string {
-  if (r.kind === 'domino')
-    return r.winner === d.mySeat ? '¡Dominó tuyo!' : `¡Dominó de ${d.nameAt(r.winner)}!`;
-  if (r.kind === 'tranque') return '¡Tranque!';
-  return 'Tranque empatado';
-}
-
-export function resultLine(r: HandResultView, d: Derived): string {
-  if (r.kind === 'tranque-tie') return `Las dos parejas suman ${r.teamPips[0]}. Nadie anota: 0–0.`;
-  const who = d.teamLabel(r.winnerTeam);
-  const verb = who === 'Nosotros' ? 'sumamos' : 'suman';
-  if (r.kind === 'tranque') {
-    return `${who} ${verb} ${r.points}: la pareja con menos puntos gana el tranque (${r.teamPips[r.winnerTeam]} contra ${r.points}).`;
-  }
-  return `${who} ${verb} ${r.points} puntos.`;
 }

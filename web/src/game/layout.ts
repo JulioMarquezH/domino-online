@@ -63,12 +63,15 @@ function angleFor(dx: number, dy: number): Angle {
   return 180;
 }
 
+/** Breathing room between neighbouring tiles (in tile widths), also at corners and rows. */
+export const GAP = 0.12;
+
 function place(c: Cursor, piece: Piece): TileBox {
   const len = piece.double ? 1 : 2;
-  const cx = c.x + (c.dx * len) / 2;
-  const cy = c.y + (c.dy * len) / 2;
-  c.x += c.dx * len;
-  c.y += c.dy * len;
+  const cx = c.x + c.dx * (GAP + len / 2);
+  const cy = c.y + c.dy * (GAP + len / 2);
+  c.x += c.dx * (GAP + len);
+  c.y += c.dy * (GAP + len);
   const horizontalFlow = c.dx !== 0;
   if (piece.double) {
     // Crosswise: perpendicular to the flow.
@@ -99,11 +102,11 @@ function place(c: Cursor, piece: Piece): TileBox {
 function step(c: Cursor, piece: Piece, limit: number): TileBox {
   if (c.dx !== 0) {
     const len = piece.double ? 1 : 2;
-    const fits = c.dx > 0 ? c.x + len <= limit : c.x - len >= -limit;
+    const fits = c.dx > 0 ? c.x + GAP + len <= limit : c.x - GAP - len >= -limit;
     // Never turn on a double: it stays crosswise in the row (it's only 1 unit long).
     if (!fits && !piece.double) {
-      // Corner: the tile hangs vertically beside the row's end.
-      c.x += c.dx * 0.5;
+      // Corner: the tile hangs vertically beside the row's end (a gap away from it).
+      c.x += c.dx * (0.5 + GAP);
       c.y -= c.v * 0.5;
       c.dx = 0;
       c.dy = c.v;
@@ -114,7 +117,7 @@ function step(c: Cursor, piece: Piece, limit: number): TileBox {
   // collide with the corner tile), in which case it continues the vertical stretch.
   if (!piece.double) {
     c.x += c.h * 0.5;
-    c.y += c.v * 0.5;
+    c.y += c.v * (0.5 + GAP);
     c.h = c.h === 1 ? -1 : 1;
     c.dx = c.h;
     c.dy = 0;
