@@ -185,7 +185,7 @@ function PlayerRow({
       <Avatar player={player} team={team} isSelf={isSelf} />
       <div className="player-meta">
         <span className="player-name">
-          {player.name}
+          <span className="name-text">{player.name}</span>
           {isSelf && <span className="tag">tú</span>}
           {player.isHost && <span className="tag tag-host">anfitrión</span>}
         </span>

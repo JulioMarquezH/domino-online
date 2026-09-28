@@ -125,6 +125,7 @@
 
 /* ───────────── lobby ───────────── */
 .lobby {
+  overflow-x: hidden;
   padding-inline: max(var(--safe-l), 14px) max(var(--safe-r), 14px);
   padding-bottom: max(var(--safe-b), 20px);
 }
@@ -178,17 +179,47 @@
   max-width: 980px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 1.1fr 1fr;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
   gap: 16px;
   align-items: start;
 }
 
 @media (max-width: 760px) and (orientation: portrait) {
   .lobby-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* Narrow phones: the room code on its own row, the two buttons under it. */
+@media (max-width: 560px) {
   .lobby-head {
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      'code code'
+      'leave copy';
+    row-gap: 12px;
+  }
+  .lobby-head > :first-child {
+    grid-area: leave;
+  }
+  .lobby-head > .room-code {
+    grid-area: code;
+  }
+  .lobby-head > :last-child {
+    grid-area: copy;
+  }
+  .room-code .code {
+    font-size: clamp(1.3rem, 7vw, 1.9rem);
+  }
+  .player-row {
+    padding: 8px 10px;
+    gap: 10px;
+  }
+  .peer-voice input[type='range'] {
+    width: 64px;
+  }
+  .lobby .card {
+    padding: 16px 14px;
   }
 }
 
@@ -255,9 +286,17 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
+}
+
+.name-text {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.player-name .tag {
+  flex: none;
 }
 
 .player-status {
@@ -682,5 +721,31 @@
   }
   .draw-side .avatar-sm {
     --av: 26px;
+  }
+}
+
+.install-tip {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(217, 176, 100, 0.08);
+  border: 1px solid rgba(217, 176, 100, 0.3);
+  font-size: 0.9rem;
+  color: var(--ink-2);
+}
+
+.install-tip strong {
+  color: var(--brass-hi);
+}
+
+@media (max-width: 360px) {
+  /* The crown on the avatar already says who hosts. */
+  .player-name .tag-host {
+    display: none;
+  }
+  .peer-voice input[type='range'] {
+    width: 52px;
   }
 }
