@@ -699,6 +699,10 @@
   color: var(--ink-3);
 }
 
+.label-short {
+  display: none;
+}
+
 .score-value {
   font-family: var(--font-display);
   font-weight: 650;
@@ -1262,4 +1266,125 @@
 .seat-slot.is-turn.pos-left .seat-text,
 .seat-slot.is-turn.pos-right .seat-text {
   margin-top: 4px;
+}
+
+/* ───────────── phones in landscape: no top bar, everything around the board ─────────────
+   With Safari's bars showing an iPhone leaves ~270px of height, so the score and the
+   buttons move into the side columns and the partner sits on the rail's top edge. */
+@media (max-height: 430px) and (orientation: landscape) {
+  .table-screen {
+    --side: clamp(84px, 11.5vw, 150px);
+  }
+  .table-grid {
+    grid-template-rows: minmax(0, 1fr) calc(var(--hw) * 2 + 10px);
+    grid-template-areas:
+      'left board right'
+      'bottombar bottombar bottombar';
+    row-gap: 4px;
+  }
+  .c-top-left,
+  .c-top-right {
+    grid-row: 1;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 2px;
+  }
+  .c-top-left {
+    grid-column: 1;
+  }
+  .c-top-right {
+    grid-column: 3;
+  }
+  .c-top {
+    grid-row: 1;
+    grid-column: 2;
+    align-items: flex-start;
+    z-index: 5;
+  }
+  .c-left,
+  .c-right {
+    grid-row: 1;
+    align-items: flex-end;
+    padding-bottom: 2px;
+  }
+  .c-bottom-left,
+  .c-bottom,
+  .c-bottom-right {
+    grid-row: 2;
+  }
+  .c-center {
+    padding-top: 13px;
+  }
+  .c-center .rail {
+    height: 100%;
+  }
+
+  /* Score: two boxes side by side, target and hand underneath. */
+  .scoreboard {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3px;
+    width: 100%;
+    max-width: 150px;
+  }
+  .score {
+    min-width: 0;
+  }
+  .score-meta {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    padding: 0;
+  }
+
+  /* Buttons: a 2×2 grid. */
+  .table-controls {
+    display: grid;
+    grid-template-columns: repeat(2, auto);
+    gap: 4px;
+    justify-content: center;
+  }
+  .table-controls .leave-confirm {
+    grid-column: 1 / -1;
+  }
+
+  /* Partner: a slim chip on the rail's top edge. */
+  .seat-slot.pos-top {
+    padding: 1px 10px 1px 2px;
+    background: rgba(3, 12, 9, 0.9);
+    border: 1px solid var(--line);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  }
+  .seat-slot.pos-top .avatar {
+    --av: 24px;
+    font-size: 0.8rem;
+  }
+  .seat-slot.pos-top .seat-role {
+    display: none;
+  }
+  .seat-slot.pos-top .mini-tile {
+    --mini: 8px;
+  }
+
+  /* Side players: a bit tighter so they fit under the score / buttons. */
+  .pos-left .mini-tile,
+  .pos-right .mini-tile {
+    margin: calc(var(--mini) * -0.56) 0;
+  }
+
+  .turn-badge {
+    font-size: 0.72rem;
+    padding: 0.2em 0.7em;
+  }
+  /* The partner's chip on the top edge already lights up. */
+  .turn-badge.at-top {
+    display: none;
+  }
+  .label-long {
+    display: none;
+  }
+  .label-short {
+    display: inline;
+  }
 }

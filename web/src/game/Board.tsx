@@ -42,7 +42,7 @@ export function Board({
   const b = layout.bounds;
   const bw = b.maxX - b.minX;
   const bh = b.maxY - b.minY;
-  const maxUnit = Math.min(size.h / 5.2, size.w / 9, 46);
+  const maxUnit = Math.min(size.h / 4.6, size.w / 8.5, 48);
   const unit = Math.max(4, Math.min(maxUnit, size.w / (bw + 1), size.h / (bh + 1)));
   const ox = size.w / 2 - ((b.minX + b.maxX) / 2) * unit;
   const oy = size.h / 2 - ((b.minY + b.maxY) / 2) * unit;

@@ -763,3 +763,13 @@
 .add-bot {
   flex: none;
 }
+
+.draw-tip {
+  margin-top: 10px;
+  font-size: 0.78rem;
+  gap: 4px;
+}
+
+.draw-tip p + p {
+  margin-top: 4px;
+}

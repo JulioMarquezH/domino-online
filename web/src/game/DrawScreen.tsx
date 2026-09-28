@@ -11,7 +11,8 @@ import { unlockAudio } from '../audio/context';
 import { sfx } from '../audio/sfx';
 import { actions } from '../net/client';
 import { Avatar } from '../ui/Avatar';
-import { autoFullscreen } from '../ui/landscape';
+import { InstallSteps } from '../ui/FullscreenButton';
+import { autoFullscreen, isIOS, isStandalone } from '../ui/landscape';
 import { TileBack, TileFace } from '../ui/Tile';
 import { derive } from './derive';
 
@@ -106,7 +107,13 @@ export function DrawScreen({ view }: { view: RoomView }) {
               })}
               {!myPick && <li className="your-move">Toca una ficha</li>}
             </ul>
-          ) : (
+          ) : null}
+          {!outcome && isIOS() && !isStandalone() && (
+            <div className="install-tip draw-tip">
+              <InstallSteps />
+            </div>
+          )}
+          {outcome && (
             <div className="draw-outcome">
               <ol className="ranking">
                 {outcome.ranking.map((id, idx) => {

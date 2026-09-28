@@ -51,10 +51,17 @@ export function FullscreenButton() {
 
 export function InstallSteps() {
   return isIOS() ? (
-    <p>
-      En iPhone, Safari no deja ocultar sus barras. Toca <strong>Compartir</strong> →{' '}
-      <strong>Agregar a inicio</strong> y abre Dominó desde ese ícono: se juega a pantalla completa.
-    </p>
+    <>
+      <p>
+        En iPhone, Safari no deja ocultar sus barras. Toca <strong>Compartir</strong> →{' '}
+        <strong>Agregar a inicio</strong> y abre Dominó desde ese ícono: se juega a pantalla
+        completa.
+      </p>
+      <p>
+        Si prefieres seguir en Safari: <strong>Ajustes → Apps → Safari</strong> y desactiva la{' '}
+        <strong>barra de pestañas en horizontal</strong> para ganar espacio.
+      </p>
+    </>
   ) : (
     <p>
       Abre el menú del navegador → <strong>Agregar a la pantalla principal</strong> y entra desde
