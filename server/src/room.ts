@@ -1,8 +1,11 @@
 import {
+  BOT_NAMES,
   DEFAULT_TARGET,
   DRAW_POSITIONS,
   MAX_PLAYERS,
   applyMatchAction,
+  chooseAction,
+  knowledgeOf,
   assignSortearSeats,
   drawStarter,
   fullSet,
@@ -20,6 +23,7 @@ import {
   type JoinErrorCode,
   type MatchState,
   type MicState,
+  type PauseDecision,
   type Phase,
   type PublicPlayer,
   type Rng,
@@ -54,6 +58,11 @@ export interface Timings {
   drawRevealMs: number;
   /** The end-of-hand summary auto-continues after this long. */
   nextHandMs: number;
+  /** How long an AI "thinks" before playing (random in [min, max]). */
+  botMinMs: number;
+  botMaxMs: number;
+  /** Simulated playouts per AI decision (strength vs CPU). */
+  botBudget: number;
 }
 
 export const DEFAULT_TIMINGS: Timings = {
@@ -62,7 +71,13 @@ export const DEFAULT_TIMINGS: Timings = {
   emptyRoomTtlMs: 600_000,
   drawRevealMs: 4_500,
   nextHandMs: 25_000,
+  botMinMs: 800,
+  botMaxMs: 1600,
+  botBudget: 1600,
 };
+
+/** Marker "socket" for AI players: always present, never emitted to. */
+export const BOT_SOCKET = 'bot';
 
 export interface Player {
   id: string;
@@ -71,6 +86,8 @@ export interface Player {
   seat: Seat | null;
   joinOrder: number;
   socketId: string | null;
+  /** Played by the AI (added in the lobby, or taking over a seat mid-game). */
+  isBot: boolean;
   mic: MicState;
   /** Mid-game disconnection bookkeeping. */
   pauseDeadline: number | null;
@@ -163,6 +180,11 @@ export class Room {
     return this.players.filter((p) => p.socketId !== null).length;
   }
 
+  /** Real people currently connected (AI players don't keep a room alive). */
+  get humansOnline(): number {
+    return this.players.filter((p) => !p.isBot && p.socketId !== null).length;
+  }
+
   get isPaused(): boolean {
     return this.phase !== 'lobby' && this.players.some((p) => p.socketId === null);
   }
@@ -171,7 +193,10 @@ export class Room {
     if (req.token) {
       const existing = this.players.find((p) => p.token === req.token);
       if (existing) {
-        const previousSocketId = existing.socketId;
+        // Coming back to a seat the AI was playing for you: take it back.
+        const previousSocketId = existing.isBot ? null : existing.socketId;
+        existing.isBot = false;
+        this.clearTimer('botmove');
         this.attach(existing, socketId);
         return { ok: true, player: existing, previousSocketId };
       }
@@ -181,8 +206,12 @@ export class Room {
     if (!name) return { ok: false, code: 'NAME_INVALID' };
 
     if (this.phase === 'lobby') {
-      if (this.players.length >= MAX_PLAYERS) return { ok: false, code: 'FULL' };
+      // A friend arriving takes the place of an AI.
+      const full = this.players.length >= MAX_PLAYERS;
+      const bot = full ? [...this.players].reverse().find((p) => p.isBot) : undefined;
+      if (full && !bot) return { ok: false, code: 'FULL' };
       if (this.nameTaken(name)) return { ok: false, code: 'NAME_TAKEN' };
+      if (bot) this.removePlayer(bot);
       // An unknown token in the lobby is honored so a player whose slot was freed keeps it.
       const player = this.createPlayer(name, req.token ?? this.deps.newToken());
       this.players.push(player);
@@ -254,6 +283,9 @@ export class Room {
     const check = this.requireHost(playerId, 'lobby');
     if (!check.ok) return check;
     this.teamMode = mode;
+    if (mode === 'manual') {
+      for (const p of this.players) if (p.isBot && p.seat === null) p.seat = this.freeSeat();
+    }
     this.changed();
     return OK;
   }
@@ -270,6 +302,33 @@ export class Room {
     return OK;
   }
 
+  addBot(playerId: string): Result {
+    const check = this.requireHost(playerId, 'lobby');
+    if (!check.ok) return check;
+    if (this.players.length >= MAX_PLAYERS) return fail('TAKEN');
+    const name = BOT_NAMES.find((n) => !this.nameTaken(n)) ?? `IA ${this.players.length + 1}`;
+    const bot = this.createPlayer(name, this.deps.newToken());
+    bot.isBot = true;
+    bot.socketId = BOT_SOCKET;
+    if (this.teamMode === 'manual') bot.seat = this.freeSeat();
+    this.players.push(bot);
+    this.changed();
+    return OK;
+  }
+
+  removeBot(playerId: string, botId: string): Result {
+    const check = this.requireHost(playerId, 'lobby');
+    if (!check.ok) return check;
+    const bot = this.getPlayer(botId);
+    if (!bot?.isBot) return fail('INVALID');
+    this.removePlayer(bot);
+    return OK;
+  }
+
+  private freeSeat(): Seat | null {
+    return ([0, 1, 2, 3] as Seat[]).find((s) => !this.players.some((p) => p.seat === s)) ?? null;
+  }
+
   start(playerId: string): Result {
     const check = this.requireHost(playerId, 'lobby');
     if (!check.ok) return check;
@@ -277,6 +336,8 @@ export class Room {
       return fail('NOT_READY');
     }
     if (this.teamMode === 'manual') {
+      // AI players sit wherever is free.
+      for (const p of this.players) if (p.isBot && p.seat === null) p.seat = this.freeSeat();
       const seats = new Set(this.players.map((p) => p.seat));
       if (seats.has(null) || seats.size !== MAX_PLAYERS) return fail('NOT_READY');
     }
@@ -380,6 +441,7 @@ export class Room {
         this.phase = 'matchEnd';
       } else {
         this.phase = 'handEnd';
+        for (const p of this.players) if (p.isBot) this.ready.add(p.id);
         this.scheduleNextHand();
       }
     }
@@ -391,7 +453,7 @@ export class Room {
     if (!this.getPlayer(playerId)) return fail('NOT_IN_ROOM');
     if (this.phase !== 'handEnd') return fail('WRONG_PHASE');
     this.ready.add(playerId);
-    if (this.players.every((p) => p.socketId !== null && this.ready.has(p.id))) {
+    if (this.players.every((p) => p.isBot || (p.socketId !== null && this.ready.has(p.id)))) {
       this.advanceHand();
     } else {
       this.changed();
@@ -439,7 +501,7 @@ export class Room {
     }
   }
 
-  decide(playerId: string, targetId: string, decision: 'wait' | 'end' | 'replace'): Result {
+  decide(playerId: string, targetId: string, decision: PauseDecision): Result {
     if (this.hostId !== playerId) return fail('NOT_HOST');
     if (this.phase === 'lobby') return fail('WRONG_PHASE');
     const target = this.getPlayer(targetId);
@@ -451,6 +513,18 @@ export class Room {
       this.changed();
     } else if (decision === 'replace') {
       target.replaceable = true;
+      this.changed();
+    } else if (decision === 'bot') {
+      // The AI plays the seat (same hand, same team). The player can still come back.
+      const wasPaused = this.isPaused;
+      this.clearTimer(`pause:${target.id}`);
+      target.isBot = true;
+      target.socketId = BOT_SOCKET;
+      target.pauseDeadline = null;
+      target.expired = false;
+      target.replaceable = false;
+      if (this.phase === 'handEnd') this.ready.add(target.id);
+      if (wasPaused && !this.isPaused) this.onResume();
       this.changed();
     } else {
       this.endMatch();
@@ -493,9 +567,9 @@ export class Room {
     player.replaceable = false;
     this.clearTimer(`lobby:${player.id}`);
     this.clearTimer(`pause:${player.id}`);
-    this.clearTimer('empty');
+    if (!player.isBot) this.clearTimer('empty');
     const host = this.hostId ? this.getPlayer(this.hostId) : undefined;
-    if (!host || host.socketId === null) this.hostId = player.id;
+    if (!player.isBot && (!host || host.socketId === null || host.isBot)) this.hostId = player.id;
     if (wasPaused && !this.isPaused) this.onResume();
     this.changed();
   }
@@ -515,7 +589,7 @@ export class Room {
   /** The host role passes to the next connected player to the right. */
   private passHostFrom(from: Player): void {
     if (this.hostId !== from.id) return;
-    const next = this.playersToTheRightOf(from).find((p) => p.socketId !== null);
+    const next = this.playersToTheRightOf(from).find((p) => !p.isBot && p.socketId !== null);
     if (next) this.hostId = next.id;
   }
 
@@ -534,10 +608,10 @@ export class Room {
   }
 
   private scheduleEmptyCheck(): void {
-    if (this.connectedCount > 0) return;
+    if (this.humansOnline > 0) return;
     if (this.timers.has('empty')) return;
     this.setTimer('empty', this.deps.timings.emptyRoomTtlMs, () => {
-      if (this.connectedCount === 0) this.deps.onExpired(this);
+      if (this.humansOnline === 0) this.deps.onExpired(this);
     });
   }
 
@@ -564,11 +638,12 @@ export class Room {
     const players: PublicPlayer[] = ordered.map((p) => ({
       id: p.id,
       name: p.name,
+      isBot: p.isBot,
       seat: p.seat,
       connected: p.socketId !== null,
       isHost: p.id === this.hostId,
-      mic: p.socketId !== null ? p.mic : 'off',
-      voiceSession: p.socketId,
+      mic: p.socketId !== null && !p.isBot ? p.mic : 'off',
+      voiceSession: p.isBot ? null : p.socketId,
       tileCount: inHand && p.seat !== null ? (match.hand.hands[p.seat]?.length ?? 0) : 0,
     }));
 
@@ -664,6 +739,7 @@ export class Room {
       seat: null,
       joinOrder: ++this.joinSeq,
       socketId: null,
+      isBot: false,
       mic: 'off',
       pauseDeadline: null,
       expired: false,
@@ -693,6 +769,56 @@ export class Room {
   }
 
   private changed(): void {
-    if (!this.disposed) this.deps.onChange(this);
+    if (this.disposed) return;
+    this.deps.onChange(this);
+    this.scheduleBots();
+  }
+
+  // ───────────────────────────── AI players ─────────────────────────────
+
+  private botDelay(): number {
+    const { botMinMs, botMaxMs } = this.deps.timings;
+    return botMinMs + this.deps.rng() * Math.max(0, botMaxMs - botMinMs);
+  }
+
+  /** Lets AI players pick their draw tile and play their turns, after a human-like pause. */
+  private scheduleBots(): void {
+    if (this.isPaused) return;
+    const draw = this.draw;
+    if (this.phase === 'draw' && draw && !draw.outcome) {
+      for (const bot of this.players) {
+        const key = `botpick:${bot.id}`;
+        if (!bot.isBot || draw.picks.some((x) => x.playerId === bot.id) || this.timers.has(key)) {
+          continue;
+        }
+        this.setTimer(key, this.botDelay(), () => {
+          const taken = new Set(this.draw?.picks.map((x) => x.position));
+          const free = Array.from({ length: DRAW_POSITIONS }, (_, i) => i).filter(
+            (i) => !taken.has(i),
+          );
+          const pos = free[Math.floor(this.deps.rng() * free.length)];
+          if (pos !== undefined) this.pick(bot.id, pos);
+        });
+      }
+    }
+    const match = this.match;
+    if (this.phase === 'playing' && match && !match.hand.result && !this.timers.has('botmove')) {
+      const seat = match.hand.turn;
+      const bot = this.players.find((p) => p.isBot && p.seat === seat);
+      if (!bot) return;
+      this.setTimer('botmove', this.botDelay(), () => {
+        const m = this.match;
+        if (this.phase !== 'playing' || !m || m.hand.turn !== seat || !bot.isBot) return;
+        // Only what that seat can see: its own tiles and the public history.
+        const action = chooseAction(knowledgeOf(m.hand, seat), this.deps.rng, {
+          budget: this.deps.timings.botBudget,
+        });
+        const r =
+          action.type === 'pass'
+            ? this.pass(bot.id, this.version)
+            : this.play(bot.id, action.tile, action.end ?? 'left', this.version);
+        if (!r.ok) this.scheduleBots();
+      });
+    }
   }
 }

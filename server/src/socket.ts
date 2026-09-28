@@ -13,7 +13,7 @@ import {
   type SignalPayload,
 } from '@domino/shared';
 import type { Server, Socket } from 'socket.io';
-import { isValidToken, type Result, type Room } from './room';
+import { BOT_SOCKET, isValidToken, type Result, type Room } from './room';
 import type { RoomManager } from './rooms';
 
 interface SocketData {
@@ -106,7 +106,7 @@ export function attachSocketHandlers(
         return;
       }
       const { player, previousSocketId } = result;
-      if (previousSocketId && previousSocketId !== socket.id) {
+      if (previousSocketId && previousSocketId !== socket.id && previousSocketId !== BOT_SOCKET) {
         const old = io.sockets.sockets.get(previousSocketId);
         if (old) {
           old.data.roomId = null;
@@ -181,6 +181,16 @@ export function attachSocketHandlers(
 
     socket.on('lobby:start', (ack) => handle(ack, (room, id) => room.start(id)));
 
+    socket.on('lobby:addBot', (ack) => handle(ack, (room, id) => room.addBot(id)));
+
+    socket.on('lobby:removeBot', (p, ack) =>
+      handle(ack, (room, id) =>
+        isRecord(p) && typeof p.playerId === 'string'
+          ? room.removeBot(id, p.playerId)
+          : { ok: false, code: 'INVALID' },
+      ),
+    );
+
     socket.on('draw:pick', (p, ack) =>
       handle(ack, (room, id) =>
         isRecord(p) && typeof p.position === 'number'
@@ -214,7 +224,10 @@ export function attachSocketHandlers(
       handle(ack, (room, id) =>
         isRecord(p) &&
         typeof p.playerId === 'string' &&
-        (p.decision === 'wait' || p.decision === 'end' || p.decision === 'replace')
+        (p.decision === 'wait' ||
+          p.decision === 'end' ||
+          p.decision === 'replace' ||
+          p.decision === 'bot')
           ? room.decide(id, p.playerId, p.decision)
           : { ok: false, code: 'INVALID' },
       ),
