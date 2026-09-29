@@ -165,8 +165,12 @@ await shot(players[3], '01-lobby-phone');
 // ── manual seats: everybody sits, then the host goes back to "Sortear" ──
 await ana.page.getByRole('radio', { name: 'Elegir asientos' }).click();
 for (const [i, p] of players.entries()) {
-  await p.page.locator('.seat').nth(i).waitFor();
-  await p.page.locator(`.seat-${['bottom', 'right', 'top', 'left'][i]}`).click();
+  // The seat map may exist twice (one per layout); use the visible one.
+  const seat = p.page.locator(
+    `.seat-picker:visible .seat-${['bottom', 'right', 'top', 'left'][i]}`,
+  );
+  await seat.waitFor();
+  await seat.click();
 }
 await until(
   async () => (await view(ana)).players.every((p) => p.seat !== null),
