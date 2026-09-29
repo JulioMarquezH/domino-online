@@ -678,6 +678,15 @@ html.ios-scroll .screen:not(.game-screen) {
   -webkit-overflow-scrolling: touch;
 }
 
+/* In landscape every screen is laid out to fit, so nothing scrolls inside it and each
+   swipe reaches the page (that's what hides Safari's bars). */
+@media (orientation: landscape) {
+  html.ios-scroll .screen:not(.game-screen),
+  html.ios-scroll .lobby .card {
+    overflow: hidden;
+  }
+}
+
 .swipe-hint {
   position: fixed;
   z-index: 70;

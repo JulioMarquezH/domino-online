@@ -221,8 +221,12 @@ function PlayerRow({
           className="btn ghost small"
           onClick={() => void actions.removeBot(player.id)}
           aria-label={`Quitar a ${player.name}`}
+          title="Quitar"
         >
-          Quitar
+          <span className="remove-long">Quitar</span>
+          <span className="remove-short" aria-hidden="true">
+            ✕
+          </span>
         </button>
       )}
     </li>

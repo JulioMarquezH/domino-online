@@ -1070,3 +1070,59 @@
     justify-content: space-between;
   }
 }
+
+/* Landscape phones: the players card is a 2×2 grid that fills its card (with or without
+   Safari's bars; Safari keeps media queries on the small viewport). */
+@media (orientation: landscape) and (max-height: 500px) {
+  .players-card {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .player-list:not(.manual) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: auto;
+    align-content: start;
+    gap: 8px;
+  }
+  .player-list:not(.manual) .player-row {
+    min-height: 56px;
+    padding: 6px 10px;
+  }
+  .player-list:not(.manual) .player-status {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .player-row .peer-voice input[type='range'] {
+    display: none;
+  }
+  .player-name .tag {
+    display: none;
+  }
+  .player-row.empty:has(.add-bot) .empty-text {
+    display: none;
+  }
+  .player-row.empty:has(.add-bot) {
+    justify-content: space-between;
+  }
+}
+
+.remove-short {
+  display: none;
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .player-list:not(.manual) .remove-long {
+    display: none;
+  }
+  .player-list:not(.manual) .remove-short {
+    display: inline;
+  }
+  .player-list:not(.manual) .player-row .btn.small {
+    width: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    padding: 0;
+    flex: none;
+  }
+}
