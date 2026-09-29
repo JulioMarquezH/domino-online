@@ -659,3 +659,55 @@ p {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* iPhone Safari: a slightly taller page lets one swipe up hide all of Safari's bars. */
+html.ios-scroll body {
+  min-height: calc(100lvh + 240px);
+}
+
+html.ios-scroll .game-screen {
+  touch-action: pan-y;
+}
+
+.swipe-hint {
+  position: fixed;
+  z-index: 70;
+  left: 50%;
+  top: calc(var(--safe-t) + 4px);
+  translate: -50% 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 650;
+  white-space: nowrap;
+  color: #1b1307;
+  background: linear-gradient(180deg, var(--brass-hi), var(--brass));
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  animation: nudge-up 1.6s ease-in-out infinite;
+}
+
+.swipe-arrow {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+@keyframes nudge-up {
+  0%,
+  100% {
+    translate: -50% 0;
+  }
+  50% {
+    translate: -50% -4px;
+  }
+}
+
+/* In the game, the audio prompt sits in the middle instead of over your tiles. */
+html.in-room .game-screen ~ .audio-unlock,
+html.in-room .audio-unlock {
+  bottom: auto;
+  top: 38%;
+}

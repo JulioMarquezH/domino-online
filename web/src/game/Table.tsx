@@ -15,6 +15,8 @@ import { navigate } from '../net/router';
 import { Avatar } from '../ui/Avatar';
 import { DoorIcon, SpeakerIcon, SpeakerOffIcon } from '../ui/icons';
 import { FullscreenButton } from '../ui/FullscreenButton';
+import { SwipeHint } from '../ui/SwipeHint';
+import { useIosBarHiding } from '../ui/useIosBarHiding';
 import { autoFullscreen } from '../ui/landscape';
 import { SelfMicButton } from '../ui/VoiceControls';
 import { Announcer, type Announcement } from './Announcer';
@@ -36,6 +38,7 @@ export function Table({ view }: { view: RoomView }) {
   const [pending, setPending] = useState(false);
   // Events that were already there when we mounted (e.g. after a reload) are not announced.
   const [initialEventId] = useState(() => view.game?.lastEvent?.id ?? null);
+  const showSwipeHint = useIosBarHiding();
 
   const mySeat = d.mySeat ?? 0;
   const paused = view.pause.length > 0;
@@ -271,6 +274,7 @@ export function Table({ view }: { view: RoomView }) {
           </button>
         </div>
       </div>
+      {showSwipeHint && <SwipeHint />}
       {view.phase === 'handEnd' && <HandSummary view={view} />}
       {view.phase === 'matchEnd' && <MatchEnd view={view} />}
     </div>

@@ -53,13 +53,12 @@ export function InstallSteps() {
   return isIOS() ? (
     <>
       <p>
-        En iPhone, Safari no deja ocultar sus barras. Toca <strong>Compartir</strong> →{' '}
-        <strong>Agregar a inicio</strong> y abre Dominó desde ese ícono: se juega a pantalla
-        completa.
+        <strong>Desliza la mesa hacia arriba</strong> y Safari esconde sus barras: el juego queda a
+        pantalla completa.
       </p>
       <p>
-        Si prefieres seguir en Safari: <strong>Ajustes → Apps → Safari</strong> y desactiva la{' '}
-        <strong>barra de pestañas en horizontal</strong> para ganar espacio.
+        O toca <strong>Compartir</strong> → <strong>Agregar a inicio</strong> y abre Dominó desde
+        ese ícono.
       </p>
     </>
   ) : (

@@ -577,7 +577,7 @@
 }
 
 .draw-slot.revealed .flip {
-  transform: rotateY(180deg) scale(1.18);
+  transform: rotateY(180deg) scale(1.08);
 }
 
 .draw-slot.mine .flip-front {
@@ -599,8 +599,11 @@
 .draw-name {
   position: absolute;
   left: 50%;
-  bottom: -0.4em;
-  transform: translate(-50%, 100%);
+  bottom: 6%;
+  transform: translateX(-50%);
+  max-width: 320%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 0.7rem;
   font-weight: 700;
   white-space: nowrap;
@@ -762,14 +765,4 @@
 
 .add-bot {
   flex: none;
-}
-
-.draw-tip {
-  margin-top: 10px;
-  font-size: 0.78rem;
-  gap: 4px;
-}
-
-.draw-tip p + p {
-  margin-top: 4px;
 }
