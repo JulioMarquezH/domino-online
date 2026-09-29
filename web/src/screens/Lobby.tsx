@@ -76,10 +76,14 @@ export function Lobby({ view }: { view: RoomView }) {
 
       <main className="lobby-grid">
         <section className="card players-card" aria-labelledby="players-title">
-          <h2 id="players-title">
-            Jugadores <span className="count">{view.players.length}/4</span>
-          </h2>
-          <ul className="player-list">
+          <div className="players-head">
+            <h2 id="players-title">
+              Jugadores <span className="count">{view.players.length}/4</span>
+            </h2>
+            <SelfMicButton />
+          </div>
+          {manual && <SeatPicker view={view} className="in-players" />}
+          <ul className={`player-list ${manual ? 'manual' : ''}`}>
             {view.players.map((p) => (
               <PlayerRow
                 key={p.id}
@@ -92,7 +96,9 @@ export function Lobby({ view }: { view: RoomView }) {
             {Array.from({ length: MAX_PLAYERS - view.players.length }, (_, i) => (
               <li key={`empty-${i}`} className="player-row empty">
                 <span className="avatar avatar-md team-none ghost-avatar" />
-                <span className="muted empty-text">Esperando jugador…</span>
+                <span className="muted empty-text">
+                  {isHost ? 'Puesto libre' : 'Esperando jugador…'}
+                </span>
                 {isHost && (
                   <button
                     type="button"
@@ -105,9 +111,6 @@ export function Lobby({ view }: { view: RoomView }) {
               </li>
             ))}
           </ul>
-          <div className="self-voice">
-            <SelfMicButton />
-          </div>
         </section>
 
         <section className="card settings-card" aria-labelledby="settings-title">
@@ -155,7 +158,7 @@ export function Lobby({ view }: { view: RoomView }) {
               </button>
             </div>
           </div>
-          <p className="setting-help">
+          <p className={`setting-help ${manual ? 'is-manual' : ''}`}>
             {manual
               ? 'Cada quien elige su silla. Las parejas se sientan frente a frente; el sorteo solo decide quién sale.'
               : 'Cada jugador levanta una ficha: las dos más altas juegan juntas y la más alta sale.'}
@@ -228,11 +231,11 @@ function PlayerRow({
 
 const SEAT_POS: Record<Seat, string> = { 0: 'bottom', 1: 'right', 2: 'top', 3: 'left' };
 
-function SeatPicker({ view }: { view: RoomView }) {
+function SeatPicker({ view, className = '' }: { view: RoomView; className?: string }) {
   const bySeat = new Map(view.players.filter((p) => p.seat !== null).map((p) => [p.seat, p]));
   const me = view.players.find((p) => p.id === view.youId);
   return (
-    <div className="seat-picker" role="group" aria-label="Elige tu asiento">
+    <div className={`seat-picker ${className}`} role="group" aria-label="Elige tu asiento">
       <div className="seat-table" aria-hidden="true" />
       {([0, 1, 2, 3] as Seat[]).map((seat) => {
         const who = bySeat.get(seat);

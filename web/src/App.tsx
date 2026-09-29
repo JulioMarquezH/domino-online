@@ -4,7 +4,9 @@ import { useClient } from './net/client';
 import { useRoute } from './net/router';
 import { Home } from './screens/Home';
 import { RoomRoute } from './screens/RoomRoute';
+import { SwipeHint } from './ui/SwipeHint';
 import { TileDefs } from './ui/Tile';
+import { useIosBarHiding } from './ui/useIosBarHiding';
 import { useVoice } from './voice/useVoice';
 import { voice } from './voice/voice';
 
@@ -12,6 +14,7 @@ export function App() {
   const route = useRoute();
   const { connected, status } = useClient();
   const inRoom = status.kind === 'in';
+  const showSwipeHint = useIosBarHiding();
 
   useEffect(() => {
     document.documentElement.classList.toggle('in-room', route.name === 'room');
@@ -27,6 +30,7 @@ export function App() {
         </div>
       )}
       {inRoom && <AudioUnlock />}
+      {showSwipeHint && <SwipeHint />}
     </>
   );
 }

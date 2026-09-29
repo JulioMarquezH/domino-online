@@ -35,32 +35,34 @@ export function HandSummary({ view }: { view: RoomView }) {
         </div>
         <p className="verdict-explain">{v.explain}</p>
         <HandBreakdown result={r} d={d} />
-        <div className="summary-score">
-          <span className={`team-text-${us}`}>
-            {d.teamLabel(us)} {g.scores[us]}
-          </span>
-          <span className="sep">—</span>
-          <span className={`team-text-${them}`}>
-            {d.teamLabel(them)} {g.scores[them]}
-          </span>
-          <span className="muted"> · a {g.target}</span>
-        </div>
-        <div className="summary-actions">
-          <button
-            type="button"
-            className="btn primary"
-            disabled={imReady}
-            onClick={() => {
-              setSent(true);
-              void actions.ready();
-            }}
-          >
-            {imReady ? 'Listo ✓' : 'Continuar'}
-          </button>
-          <span className="muted small">
-            {view.ready.length}/4 listos
-            {left !== null && ` · siguiente mano en ${Math.ceil(left / 1000)} s`}
-          </span>
+        <div className="summary-foot">
+          <div className="summary-score">
+            <span className={`team-text-${us}`}>
+              {d.teamLabel(us)} {g.scores[us]}
+            </span>
+            <span className="sep">—</span>
+            <span className={`team-text-${them}`}>
+              {d.teamLabel(them)} {g.scores[them]}
+            </span>
+            <span className="muted"> · a {g.target}</span>
+          </div>
+          <div className="summary-actions">
+            <button
+              type="button"
+              className="btn primary"
+              disabled={imReady}
+              onClick={() => {
+                setSent(true);
+                void actions.ready();
+              }}
+            >
+              {imReady ? 'Listo ✓' : 'Continuar'}
+            </button>
+            <span className="muted small">
+              {view.ready.length}/4 listos
+              {left !== null && ` · siguiente mano en ${Math.ceil(left / 1000)} s`}
+            </span>
+          </div>
         </div>
       </div>
     </div>

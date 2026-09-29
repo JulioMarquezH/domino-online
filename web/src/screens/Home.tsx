@@ -10,8 +10,6 @@ import { unlockAudio } from '../audio/context';
 import { createRoom } from '../net/client';
 import { navigate, roomPath } from '../net/router';
 import { storage } from '../net/storage';
-import { InstallSteps } from '../ui/FullscreenButton';
-import { isIOS, isStandalone } from '../ui/landscape';
 import { TileFace } from '../ui/Tile';
 
 const ALLOWED = new RegExp(`[^${ROOM_ID_ALPHABET}]`, 'g');
@@ -23,9 +21,6 @@ export function Home() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const cleanName = sanitizeName(name);
-  const [showTip, setShowTip] = useState(
-    () => isIOS() && !isStandalone() && !storage.getFlag('ios-tip'),
-  );
 
   const onCreate = async () => {
     unlockAudio();
@@ -70,87 +65,75 @@ export function Home() {
         </div>
       </div>
       <main className="home-card">
-        <p className="eyebrow">Salas privadas · voz en vivo</p>
-        <h1 className="brand">
-          Dominó<span>.</span>
-        </h1>
-        <p className="tagline">Partidas en pareja con los tuyos, como en la mesa de siempre.</p>
+        <div className="home-intro">
+          <p className="eyebrow">Salas privadas · voz en vivo</p>
+          <h1 className="brand">
+            Dominó<span>.</span>
+          </h1>
+          <p className="tagline">Partidas en pareja con los tuyos, como en la mesa de siempre.</p>
+        </div>
+        <div className="home-form">
+          <label className="field">
+            <span>Tu nombre</span>
+            <input
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value.slice(0, NAME_MAX_LENGTH + 5));
+                setError(null);
+              }}
+              maxLength={NAME_MAX_LENGTH}
+              placeholder="¿Cómo te llaman en la mesa?"
+              autoComplete="nickname"
+              enterKeyHint="go"
+            />
+          </label>
 
-        <label className="field">
-          <span>Tu nombre</span>
-          <input
-            value={name}
-            onChange={(e) => {
-              setName(e.target.value.slice(0, NAME_MAX_LENGTH + 5));
-              setError(null);
-            }}
-            maxLength={NAME_MAX_LENGTH}
-            placeholder="¿Cómo te llaman en la mesa?"
-            autoComplete="nickname"
-            enterKeyHint="go"
-          />
-        </label>
-
-        {!joining ? (
-          <div className="home-actions">
-            <button type="button" className="btn primary" onClick={onCreate} disabled={busy}>
-              {busy ? 'Creando…' : 'Crear sala'}
-            </button>
-            <button type="button" className="btn secondary" onClick={() => setJoining(true)}>
-              Unirse
-            </button>
-          </div>
-        ) : (
-          <form className="join-form" onSubmit={onJoin}>
-            <label className="field">
-              <span>Código de la sala</span>
-              <input
-                className="code-input"
-                value={code}
-                onChange={(e) => {
-                  setCode(
-                    e.target.value.toUpperCase().replace(ALLOWED, '').slice(0, ROOM_ID_LENGTH),
-                  );
-                  setError(null);
-                }}
-                placeholder="ABC234"
-                autoCapitalize="characters"
-                autoCorrect="off"
-                spellCheck={false}
-                inputMode="text"
-                autoFocus
-              />
-            </label>
+          {!joining ? (
             <div className="home-actions">
-              <button type="submit" className="btn primary">
-                Entrar
+              <button type="button" className="btn primary" onClick={onCreate} disabled={busy}>
+                {busy ? 'Creando…' : 'Crear sala'}
               </button>
-              <button type="button" className="btn ghost" onClick={() => setJoining(false)}>
-                Volver
+              <button type="button" className="btn secondary" onClick={() => setJoining(true)}>
+                Unirse
               </button>
             </div>
-          </form>
-        )}
-        {error && (
-          <p className="form-error" role="alert">
-            {error}
-          </p>
-        )}
-        {showTip && (
-          <div className="install-tip">
-            <InstallSteps />
-            <button
-              type="button"
-              className="btn ghost small"
-              onClick={() => {
-                storage.setFlag('ios-tip');
-                setShowTip(false);
-              }}
-            >
-              Entendido
-            </button>
-          </div>
-        )}
+          ) : (
+            <form className="join-form" onSubmit={onJoin}>
+              <label className="field">
+                <span>Código de la sala</span>
+                <input
+                  className="code-input"
+                  value={code}
+                  onChange={(e) => {
+                    setCode(
+                      e.target.value.toUpperCase().replace(ALLOWED, '').slice(0, ROOM_ID_LENGTH),
+                    );
+                    setError(null);
+                  }}
+                  placeholder="ABC234"
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  inputMode="text"
+                  autoFocus
+                />
+              </label>
+              <div className="home-actions">
+                <button type="submit" className="btn primary">
+                  Entrar
+                </button>
+                <button type="button" className="btn ghost" onClick={() => setJoining(false)}>
+                  Volver
+                </button>
+              </div>
+            </form>
+          )}
+          {error && (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          )}
+        </div>
       </main>
     </div>
   );

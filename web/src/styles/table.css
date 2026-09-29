@@ -1636,3 +1636,67 @@
     font-size: 1.35rem;
   }
 }
+
+.summary-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 18px;
+}
+
+/* Very short screens (iPhone with Safari's bars): the summary without the explanation. */
+@media (max-height: 340px) {
+  .summary-card,
+  .match-card {
+    padding: 8px 12px;
+    gap: 5px;
+  }
+  .verdict-title {
+    font-size: 1.15rem;
+  }
+  .points-pill {
+    font-size: 0.8rem;
+    padding: 2px 10px;
+  }
+  .verdict-explain {
+    display: none;
+  }
+  .team-panel {
+    padding: 4px 8px;
+    gap: 2px;
+    border-radius: 12px;
+  }
+  .team-panel li {
+    gap: 6px;
+  }
+  .bd-name {
+    font-size: 0.8rem;
+  }
+  .team-panel footer {
+    padding-top: 2px;
+  }
+  .reveal-tile {
+    --rh: 15px;
+  }
+  .summary-score {
+    font-size: 1rem;
+  }
+  .summary-actions .btn {
+    min-height: 38px;
+  }
+  .summary-actions {
+    grid-auto-flow: column;
+    align-items: center;
+    gap: 10px;
+  }
+  .final-value {
+    font-size: 1.8rem;
+  }
+  .match-card .big-title {
+    font-size: 1.1rem;
+  }
+  .final-names {
+    font-size: 0.75rem;
+  }
+}

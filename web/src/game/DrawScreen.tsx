@@ -11,8 +11,6 @@ import { unlockAudio } from '../audio/context';
 import { sfx } from '../audio/sfx';
 import { actions } from '../net/client';
 import { Avatar } from '../ui/Avatar';
-import { SwipeHint } from '../ui/SwipeHint';
-import { useIosBarHiding } from '../ui/useIosBarHiding';
 import { autoFullscreen } from '../ui/landscape';
 import { TileBack, TileFace } from '../ui/Tile';
 import { derive } from './derive';
@@ -27,7 +25,6 @@ export function DrawScreen({ view }: { view: RoomView }) {
   const draw = view.draw;
   const d = derive(view);
   const [pending, setPending] = useState<number | null>(null);
-  const showSwipeHint = useIosBarHiding();
   if (!draw) return null;
   const byPosition = new Map(draw.picks.map((p) => [p.position, p]));
   const myPick = draw.picks.find((p) => p.playerId === view.youId);
@@ -145,7 +142,6 @@ export function DrawScreen({ view }: { view: RoomView }) {
           )}
         </aside>
       </div>
-      {showSwipeHint && <SwipeHint />}
     </div>
   );
 }

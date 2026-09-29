@@ -669,6 +669,15 @@ html.ios-scroll .game-screen {
   touch-action: pan-y;
 }
 
+/* Every other screen stays put too (its own scroll when it's long); the swipe that reaches
+   the page underneath is what makes Safari hide its bars. */
+html.ios-scroll .screen:not(.game-screen) {
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .swipe-hint {
   position: fixed;
   z-index: 70;
@@ -687,7 +696,16 @@ html.ios-scroll .game-screen {
   background: linear-gradient(180deg, var(--brass-hi), var(--brass));
   box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
   pointer-events: none;
-  animation: nudge-up 1.6s ease-in-out infinite;
+  animation:
+    nudge-up 1.6s ease-in-out infinite,
+    hint-out 0.6s 7s ease forwards;
+}
+
+@keyframes hint-out {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
 }
 
 .swipe-arrow {
