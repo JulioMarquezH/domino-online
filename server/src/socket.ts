@@ -1,4 +1,5 @@
 import {
+  isRecord,
   isSeat,
   isTarget,
   isTileId,
@@ -12,26 +13,22 @@ import {
   type ServerToClientEvents,
   type SignalPayload,
 } from '@domino/shared';
-import type { Server, Socket } from 'socket.io';
-import { BOT_SOCKET, isValidToken, type Result, type Room } from './room';
+import { BOT_SOCKET, isValidToken, type Result, type Room, type TournamentIdentity } from './room';
 import type { RoomManager } from './rooms';
+import {
+  attachTournamentHandlers,
+  clientIp,
+  type DominoServer,
+  type DominoSocket,
+} from './tournament-socket';
+import type { TournamentService } from './tournaments';
 
-interface SocketData {
-  roomId: string | null;
-  playerId: string | null;
-}
-
-export type DominoServer = Server<ClientToServerEvents, ServerToClientEvents, object, SocketData>;
-type DominoSocket = Socket<ClientToServerEvents, ServerToClientEvents, object, SocketData>;
+export type { DominoServer } from './tournament-socket';
 
 const MAX_SDP = 20_000;
 
 function safeAck<T extends object>(ack: unknown): (r: Ack<T>) => void {
   return typeof ack === 'function' ? (ack as (r: Ack<T>) => void) : () => undefined;
-}
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null;
 }
 
 /** Sends every connected player their own view of the room (coalesced per tick). */
@@ -54,10 +51,15 @@ export function attachSocketHandlers(
   io: DominoServer,
   manager: RoomManager,
   iceServersFor: (playerId: string) => RTCIceServerConfig[],
+  tournaments: TournamentService,
+  options: { trustProxy: boolean } = { trustProxy: false },
 ): void {
   io.on('connection', (socket: DominoSocket) => {
     socket.data.roomId = null;
     socket.data.playerId = null;
+    socket.data.tournamentId = null;
+    const ctx = { ip: clientIp(socket, options.trustProxy), socketId: socket.id };
+    attachTournamentHandlers(socket, tournaments, ctx);
 
     const current = (): { room: Room; playerId: string } | null => {
       const { roomId, playerId } = socket.data;
@@ -95,13 +97,19 @@ export function attachSocketHandlers(
 
     const enter = (
       room: Room,
-      req: { name: string | null; token: string | null },
+      req: { name: string | null; token: string | null; identity?: TournamentIdentity | null },
       reply: (r: Ack<JoinOk>) => void,
     ) => {
       const previous = current();
       if (previous && previous.room !== room) leaveCurrent();
       const result = room.join(req, socket.id);
       if (!result.ok) {
+        if (room.tournament) {
+          // Don't confirm that a tournament room exists to someone who isn't one of its players.
+          tournaments.recordFailure(ctx);
+          reply({ ok: false, code: 'NOT_FOUND' });
+          return;
+        }
         reply({ ok: false, code: result.code });
         return;
       }
@@ -150,6 +158,18 @@ export function attachSocketHandlers(
       }
       const token = isValidToken(p.token) ? p.token : null;
       const name = typeof p.name === 'string' ? p.name : null;
+      const spec = room.tournament;
+      if (spec) {
+        // Tournament rooms: the device's tournament token (or its room token) is the only way in.
+        const blocked = tournaments.blockedFor(ctx);
+        if (blocked > 0) {
+          reply({ ok: false, code: 'RATE_LIMITED', retryAfterMs: blocked });
+          return;
+        }
+        const letter = tournaments.identify(spec.tournamentId, p.tt);
+        enter(room, { name: null, token, identity: letter ? { letter } : null }, reply);
+        return;
+      }
       enter(room, { name, token }, reply);
     });
 

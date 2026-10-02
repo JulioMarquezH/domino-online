@@ -9,6 +9,15 @@ export interface ServerConfig {
   /** Directory with the built web app, served in production. */
   webDist: string | null;
   pauseMs: number;
+  /** SQLite file with the tournaments (WAL mode; the directory must be writable and persistent). */
+  databasePath: string;
+  /** Believe X-Forwarded-For: only safe when the port is reachable solely through Caddy. */
+  trustProxy: boolean;
+  /**
+   * Test-only override of the tournament match target. Ignored in production, so a stray
+   * variable can never shorten real tournament matches.
+   */
+  tournamentTarget: number | undefined;
 }
 
 const DEFAULT_ICE: RTCIceServerConfig[] = [{ urls: 'stun:stun.l.google.com:19302' }];
@@ -36,6 +45,12 @@ export function parseIceServers(raw: string | undefined): RTCIceServerConfig[] {
   });
 }
 
+function testTarget(env: NodeJS.ProcessEnv): number | undefined {
+  if (env.NODE_ENV === 'production') return undefined;
+  const n = Number(env.TOURNAMENT_TARGET_TEST);
+  return Number.isInteger(n) && n > 0 ? n : undefined;
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   const port = Number(env.PORT ?? 3001);
   if (!Number.isInteger(port) || port <= 0) throw new Error('PORT must be a positive integer');
@@ -51,6 +66,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     turn: turnUrls.length > 0 && turnSecret ? { urls: turnUrls, secret: turnSecret } : null,
     webDist: env.WEB_DIST ?? null,
     pauseMs: Number.isFinite(pauseMs) && pauseMs > 0 ? pauseMs : 120_000,
+    databasePath: env.DATABASE_PATH?.trim() || './data/domino.db',
+    trustProxy: env.TRUST_PROXY ? env.TRUST_PROXY === '1' : env.NODE_ENV === 'production',
+    tournamentTarget: testTarget(env),
   };
 }
 

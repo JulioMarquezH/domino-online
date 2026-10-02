@@ -8,3 +8,4 @@ export * from './ai';
 export * from './protocol';
 export * from './tournament';
 export * from './tournament-protocol';
+export * from './guards';

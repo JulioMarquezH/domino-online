@@ -1,15 +1,27 @@
 import type { Rng } from '@domino/shared';
 import { cryptoRng, newPlayerId, newRoomId, newToken } from './ids';
-import { DEFAULT_TIMINGS, Room, realClock, type Clock, type Timings } from './room';
+import {
+  DEFAULT_TIMINGS,
+  Room,
+  realClock,
+  type Clock,
+  type Timings,
+  type TournamentHooks,
+} from './room';
 
 export interface RoomManagerOptions {
   clock?: Clock;
   timings?: Partial<Timings>;
   rng?: Rng;
   onChange: (room: Room) => void;
+  /** Called after a room is removed (expired, deleted or disposed). */
+  onRemoved?: (room: Room) => void;
 }
 
-/** All rooms live in memory. A server restart loses them (by design: no database). */
+/**
+ * All rooms live in memory. A server restart loses them (by design); what survives is what the
+ * tournament recorder already wrote to SQLite when a tournament match finished.
+ */
 export class RoomManager {
   private rooms = new Map<string, Room>();
   private readonly clock: Clock;
@@ -30,7 +42,7 @@ export class RoomManager {
     return this.rooms.get(id);
   }
 
-  create(): Room {
+  create(tournament?: TournamentHooks): Room {
     let id = newRoomId();
     while (this.rooms.has(id)) id = newRoomId();
     const room = new Room(id, {
@@ -41,6 +53,7 @@ export class RoomManager {
       newToken,
       onChange: this.options.onChange,
       onExpired: (r) => this.delete(r.id),
+      tournament,
     });
     this.rooms.set(id, room);
     return room;
@@ -51,6 +64,7 @@ export class RoomManager {
     if (!room) return;
     room.dispose();
     this.rooms.delete(id);
+    this.options.onRemoved?.(room);
   }
 
   dispose(): void {

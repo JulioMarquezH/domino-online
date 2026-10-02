@@ -17,11 +17,14 @@ const app = createApp({
   turn: config.turn,
   webDist,
   timings: { pauseMs: config.pauseMs },
+  databasePath: config.databasePath,
+  trustProxy: config.trustProxy,
+  tournamentTarget: config.tournamentTarget,
 });
 
 app.http.listen(config.port, () => {
   console.log(
-    `[domino] listening on :${config.port}${webDist ? ` (serving ${webDist})` : ' (API only)'}${config.turn ? ' + TURN' : ''}`,
+    `[domino] listening on :${config.port}${webDist ? ` (serving ${webDist})` : ' (API only)'}${config.turn ? ' + TURN' : ''} · db ${config.databasePath}`,
   );
 });
 

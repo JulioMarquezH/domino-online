@@ -21,8 +21,10 @@ import {
   type DrawPickView,
   type End,
   type JoinErrorCode,
+  type Letter,
   type MatchState,
   type MicState,
+  type Pairing,
   type PauseDecision,
   type Phase,
   type PublicPlayer,
@@ -30,9 +32,11 @@ import {
   type RoomView,
   type Seat,
   type TableEvent,
+  type Team,
   type Target,
   type TeamMode,
   type TileId,
+  type TournamentRoomInfo,
 } from '@domino/shared';
 
 export interface Clock {
@@ -93,7 +97,60 @@ export interface Player {
   pauseDeadline: number | null;
   expired: boolean;
   replaceable: boolean;
+  /** Tournament rooms only: the registered player this seat belongs to. */
+  letter?: Letter;
 }
+
+/** A private room created for one slot of a tournament: locked to its four registered players. */
+export interface TournamentRoomSpec {
+  tournamentId: string;
+  jornada: number;
+  slot: number;
+  /** 1..12 */
+  number: number;
+  pairing: Pairing;
+  /** The match target. Always the server constant (tests inject another value through createApp). */
+  target: Target;
+  /** Fixed seats: pair 1 is team 0 (seats 0 and 2), pair 2 is team 1 (seats 1 and 3). */
+  seats: Record<Letter, { seat: Seat; name: string }>;
+}
+
+/** One finished hand, kept with the match record. */
+export interface HandLogEntry {
+  hand: number;
+  starter: Seat;
+  kind: 'domino' | 'tranque' | 'tranque-tie';
+  winnerTeam: Team | null;
+  points: number;
+  /** Match score after the hand. */
+  scores: [number, number];
+}
+
+/** What a finished tournament match hands to the recorder. */
+export interface MatchOutcome {
+  spec: TournamentRoomSpec;
+  roomId: string;
+  startedAt: string | null;
+  endedAt: string;
+  winnerPair: 1 | 2;
+  scorePair1: number;
+  scorePair2: number;
+  hands: HandLogEntry[];
+}
+
+export interface TournamentHooks {
+  spec: TournamentRoomSpec;
+  /** Persists the finished match synchronously (one transaction). Throws when the write fails. */
+  record: (outcome: MatchOutcome) => void;
+}
+
+/** Who a socket proved to be (a registered player of the tournament this room belongs to). */
+export interface TournamentIdentity {
+  letter: Letter;
+}
+
+/** Retry delays for a failed save: 1 s, 2 s, 4 s … capped at 30 s, forever. */
+export const saveRetryDelay = (attempt: number): number => Math.min(30_000, 1000 * 2 ** attempt);
 
 export interface RoomDeps {
   clock: Clock;
@@ -105,6 +162,8 @@ export interface RoomDeps {
   onChange: (room: Room) => void;
   /** Called when the room has been empty for `emptyRoomTtlMs`. */
   onExpired: (room: Room) => void;
+  /** Present only in tournament rooms. */
+  tournament?: TournamentHooks;
 }
 
 type DrawMode = 'sortear' | 'starter';
@@ -161,13 +220,34 @@ export class Room {
   private joinSeq = 0;
   private disposed = false;
   private timers = new Map<string, unknown>();
+  // Tournament bookkeeping (unused in casual rooms).
+  private handLog: HandLogEntry[] = [];
+  private startedAt: string | null = null;
+  private pendingOutcome: MatchOutcome | null = null;
+  private saved = false;
+  private saveAttempts = 0;
 
   constructor(
     readonly id: string,
     private readonly deps: RoomDeps,
   ) {
+    if (deps.tournament) {
+      // Tournament rooms are locked: fixed target, fixed seats, no AI, no replacements.
+      this.target = deps.tournament.spec.target;
+      this.teamMode = 'manual';
+    }
     // A freshly created room is empty until its creator joins.
     this.scheduleEmptyCheck();
+  }
+
+  /** Set only in tournament rooms. */
+  get tournament(): TournamentRoomSpec | null {
+    return this.deps.tournament?.spec ?? null;
+  }
+
+  /** The result is in the database (tournament rooms only). */
+  get isSaved(): boolean {
+    return this.saved;
   }
 
   // ───────────────────────────── membership ─────────────────────────────
@@ -189,7 +269,11 @@ export class Room {
     return this.phase !== 'lobby' && this.players.some((p) => p.socketId === null);
   }
 
-  join(req: { name: string | null; token: string | null }, socketId: string): JoinResult {
+  join(
+    req: { name: string | null; token: string | null; identity?: TournamentIdentity | null },
+    socketId: string,
+  ): JoinResult {
+    if (this.deps.tournament) return this.joinTournament(req, socketId, this.deps.tournament.spec);
     if (req.token) {
       const existing = this.players.find((p) => p.token === req.token);
       if (existing) {
@@ -228,6 +312,35 @@ export class Room {
     this.players[this.players.indexOf(open)] = player;
     this.ready.delete(open.id);
     if (this.hostId === open.id) this.hostId = null;
+    this.attach(player, socketId);
+    return { ok: true, player, previousSocketId: null };
+  }
+
+  /**
+   * Tournament rooms admit only the four registered players, each at the seat their pairing
+   * gives them. A returning player (same device token, or the same registered identity from
+   * another device) takes their seat back, exactly like a casual-room reclaim.
+   */
+  private joinTournament(
+    req: { token: string | null; identity?: TournamentIdentity | null },
+    socketId: string,
+    spec: TournamentRoomSpec,
+  ): JoinResult {
+    const byToken = req.token ? this.players.find((p) => p.token === req.token) : undefined;
+    const letter = byToken?.letter ?? req.identity?.letter;
+    if (!letter) return { ok: false, code: 'FORBIDDEN' };
+    const existing = byToken ?? this.players.find((p) => p.letter === letter);
+    if (existing) {
+      const previousSocketId = existing.socketId;
+      this.attach(existing, socketId);
+      return { ok: true, player: existing, previousSocketId };
+    }
+    const slot = spec.seats[letter];
+    if (!slot || this.phase !== 'lobby') return { ok: false, code: 'FORBIDDEN' };
+    const player = this.createPlayer(slot.name, this.deps.newToken());
+    player.seat = slot.seat;
+    player.letter = letter;
+    this.players.push(player);
     this.attach(player, socketId);
     return { ok: true, player, previousSocketId: null };
   }
@@ -272,6 +385,7 @@ export class Room {
   // ───────────────────────────── lobby ─────────────────────────────
 
   setTarget(playerId: string, target: Target): Result {
+    if (this.deps.tournament) return fail('LOCKED');
     const check = this.requireHost(playerId, 'lobby');
     if (!check.ok) return check;
     this.target = target;
@@ -280,6 +394,7 @@ export class Room {
   }
 
   setTeamMode(playerId: string, mode: TeamMode): Result {
+    if (this.deps.tournament) return fail('LOCKED');
     const check = this.requireHost(playerId, 'lobby');
     if (!check.ok) return check;
     this.teamMode = mode;
@@ -291,6 +406,7 @@ export class Room {
   }
 
   sit(playerId: string, seat: Seat | null): Result {
+    if (this.deps.tournament) return fail('LOCKED');
     const player = this.getPlayer(playerId);
     if (!player) return fail('NOT_IN_ROOM');
     if (this.phase !== 'lobby' || this.teamMode !== 'manual') return fail('WRONG_PHASE');
@@ -303,6 +419,7 @@ export class Room {
   }
 
   addBot(playerId: string): Result {
+    if (this.deps.tournament) return fail('LOCKED');
     const check = this.requireHost(playerId, 'lobby');
     if (!check.ok) return check;
     if (this.players.length >= MAX_PLAYERS) return fail('TAKEN');
@@ -317,6 +434,7 @@ export class Room {
   }
 
   removeBot(playerId: string, botId: string): Result {
+    if (this.deps.tournament) return fail('LOCKED');
     const check = this.requireHost(playerId, 'lobby');
     if (!check.ok) return check;
     const bot = this.getPlayer(botId);
@@ -407,6 +525,8 @@ export class Room {
     if (this.phase !== 'draw' || !draw || draw.starter === null) return;
     if (this.isPaused) return; // resumed from onResume()
     this.match = startMatch(this.target, draw.starter, this.deps.rng);
+    this.handLog = [];
+    this.startedAt = new Date(this.deps.clock.now()).toISOString();
     this.draw = null;
     this.phase = 'playing';
     this.lastEvent = null;
@@ -437,8 +557,11 @@ export class Room {
     if (last) this.lastEvent = { ...last, id: ++this.eventSeq };
     if (this.match.hand.result) {
       this.ready.clear();
+      this.logHand(this.match);
       if (this.match.winner !== null) {
         this.phase = 'matchEnd';
+        // Persist BEFORE the "Partido guardado" state is broadcast (bump below).
+        this.finishTournamentMatch(this.match);
       } else {
         this.phase = 'handEnd';
         for (const p of this.players) if (p.isBot) this.ready.add(p.id);
@@ -447,6 +570,62 @@ export class Room {
     }
     this.bump();
     return OK;
+  }
+
+  // ───────────────────────────── tournament records ─────────────────────────────
+
+  private logHand(match: MatchState): void {
+    if (!this.deps.tournament || !match.hand.result) return;
+    const r = match.hand.result;
+    this.handLog.push({
+      hand: match.handNumber,
+      starter: match.hand.starter,
+      kind: r.kind,
+      winnerTeam: r.winnerTeam,
+      points: r.points,
+      scores: [match.scores[0], match.scores[1]],
+    });
+  }
+
+  /** The match reached its target: write it down. A failed write is retried until it succeeds. */
+  private finishTournamentMatch(match: MatchState): void {
+    const hooks = this.deps.tournament;
+    if (!hooks || match.winner === null || this.pendingOutcome) return;
+    this.pendingOutcome = {
+      spec: hooks.spec,
+      roomId: this.id,
+      startedAt: this.startedAt,
+      endedAt: new Date(this.deps.clock.now()).toISOString(),
+      winnerPair: (match.winner + 1) as 1 | 2,
+      scorePair1: match.scores[0],
+      scorePair2: match.scores[1],
+      hands: this.handLog.map((h) => ({ ...h })),
+    };
+    this.saveAttempts = 0;
+    this.trySave();
+  }
+
+  private trySave(): void {
+    const hooks = this.deps.tournament;
+    const outcome = this.pendingOutcome;
+    if (!hooks || !outcome || this.saved) return;
+    try {
+      hooks.record(outcome);
+      this.saved = true;
+      this.clearTimer('save');
+    } catch (error) {
+      const delay = saveRetryDelay(this.saveAttempts++);
+      console.error(
+        `[domino] CRITICAL: could not save tournament match ${outcome.spec.tournamentId} ` +
+          `J${outcome.spec.jornada}/${outcome.spec.slot} (attempt ${this.saveAttempts}); ` +
+          `retrying in ${delay} ms. The room stays open until it is stored.`,
+        error,
+      );
+      this.setTimer('save', delay, () => {
+        this.trySave();
+        if (this.saved) this.bump();
+      });
+    }
   }
 
   markReady(playerId: string): Result {
@@ -478,6 +657,7 @@ export class Room {
   }
 
   rematch(playerId: string, keepTeams: boolean): Result {
+    if (this.deps.tournament) return fail('LOCKED');
     const check = this.requireHost(playerId, 'matchEnd');
     if (!check.ok) return check;
     if (this.isPaused) return fail('PAUSED');
@@ -504,6 +684,11 @@ export class Room {
   decide(playerId: string, targetId: string, decision: PauseDecision): Result {
     if (this.hostId !== playerId) return fail('NOT_HOST');
     if (this.phase === 'lobby') return fail('WRONG_PHASE');
+    if (this.deps.tournament) {
+      // No AI takeover and no replacement seats; once the result is stored the room is done.
+      if (decision === 'bot' || decision === 'replace') return fail('LOCKED');
+      if (this.pendingOutcome) return fail('WRONG_PHASE');
+    }
     const target = this.getPlayer(targetId);
     if (!target || target.socketId !== null) return fail('INVALID');
     if (!target.expired) return fail('NOT_READY');
@@ -548,6 +733,9 @@ export class Room {
     this.lastEvent = null;
     this.ready.clear();
     this.nextHandAt = null;
+    // An abandoned tournament match records nothing: the slot is replayed from zero.
+    this.handLog = [];
+    this.startedAt = null;
     this.bump();
   }
 
@@ -609,6 +797,8 @@ export class Room {
 
   private scheduleEmptyCheck(): void {
     if (this.humansOnline > 0) return;
+    // A finished tournament match that is not stored yet must outlive its players.
+    if (this.pendingOutcome && !this.saved) return;
     if (this.timers.has('empty')) return;
     this.setTimer('empty', this.deps.timings.emptyRoomTtlMs, () => {
       if (this.humansOnline === 0) this.deps.onExpired(this);
@@ -616,6 +806,8 @@ export class Room {
   }
 
   dispose(): void {
+    // Last chance to store a finished tournament match (e.g. on shutdown).
+    if (this.pendingOutcome && !this.saved) this.trySave();
     this.disposed = true;
     for (const key of [...this.timers.keys()]) this.clearTimer(key);
   }
@@ -645,6 +837,7 @@ export class Room {
       mic: p.socketId !== null && !p.isBot ? p.mic : 'off',
       voiceSession: p.isBot ? null : p.socketId,
       tileCount: inHand && p.seat !== null ? (match.hand.hands[p.seat]?.length ?? 0) : 0,
+      ...(p.letter ? { letter: p.letter } : {}),
     }));
 
     const reveal = this.phase === 'handEnd' || this.phase === 'matchEnd';
@@ -691,7 +884,7 @@ export class Room {
           ? Math.max(0, this.nextHandAt - now)
           : null,
       pause:
-        this.phase === 'lobby'
+        this.phase === 'lobby' || (this.deps.tournament && this.phase === 'matchEnd')
           ? []
           : this.players
               .filter((p) => p.socketId === null)
@@ -703,6 +896,20 @@ export class Room {
                 replaceable: p.replaceable,
               })),
       matchWinner: this.phase === 'matchEnd' ? (match?.winner ?? null) : null,
+      ...(this.deps.tournament
+        ? { tournament: this.tournamentInfo(this.deps.tournament.spec) }
+        : {}),
+    };
+  }
+
+  private tournamentInfo(spec: TournamentRoomSpec): TournamentRoomInfo {
+    return {
+      id: spec.tournamentId,
+      jornada: spec.jornada,
+      slot: spec.slot,
+      number: spec.number,
+      pairing: spec.pairing,
+      saved: this.saved,
     };
   }
 
