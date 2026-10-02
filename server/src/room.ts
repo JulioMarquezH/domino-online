@@ -912,6 +912,9 @@ export class Room {
       number: spec.number,
       pairing: spec.pairing,
       saved: this.saved,
+      roster: (Object.entries(spec.seats) as [Letter, { seat: Seat; name: string }][])
+        .map(([letter, v]) => ({ letter, name: v.name, seat: v.seat }))
+        .sort((a, b) => a.letter.localeCompare(b.letter)),
     };
   }
 

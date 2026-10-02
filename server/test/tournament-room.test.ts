@@ -125,6 +125,12 @@ describe('tournament room: who can sit', () => {
       number: 2,
       pairing: 'AB-CD',
       saved: false,
+      roster: [
+        { letter: 'A', name: 'Ana', seat: 0 },
+        { letter: 'B', name: 'Beto', seat: 2 },
+        { letter: 'C', name: 'Caro', seat: 1 },
+        { letter: 'D', name: 'Dani', seat: 3 },
+      ],
     });
   });
 

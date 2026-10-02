@@ -7,8 +7,8 @@ import {
   type Seat,
 } from '@domino/shared';
 import { useState } from 'react';
-import { actions, leaveRoom } from '../net/client';
-import { navigate, roomUrl } from '../net/router';
+import { actions, exitRoom } from '../net/client';
+import { roomUrl } from '../net/router';
 import { derive } from '../game/derive';
 import { Avatar } from '../ui/Avatar';
 import { useCopied } from '../ui/hooks';
@@ -44,14 +44,7 @@ export function Lobby({ view }: { view: RoomView }) {
   return (
     <div className="screen lobby">
       <header className="lobby-head">
-        <button
-          type="button"
-          className="btn ghost small"
-          onClick={() => {
-            leaveRoom();
-            navigate('/');
-          }}
-        >
+        <button type="button" className="btn ghost small" onClick={exitRoom}>
           <DoorIcon size={18} /> Salir
         </button>
         <div className="room-code" aria-label={`Código de la sala ${view.roomId}`}>
@@ -187,7 +180,7 @@ export function Lobby({ view }: { view: RoomView }) {
   );
 }
 
-function PlayerRow({
+export function PlayerRow({
   player,
   isSelf,
   manual,

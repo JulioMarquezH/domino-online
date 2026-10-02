@@ -4,6 +4,7 @@ import '@fontsource-variable/dm-sans/wght.css';
 import './styles/base.css';
 import './styles/screens.css';
 import './styles/table.css';
+import './styles/tournament.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';

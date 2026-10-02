@@ -24,7 +24,8 @@
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "e2e": "node scripts/e2e.mjs",
-    "e2e:bots": "node scripts/e2e-bots.mjs"
+    "e2e:bots": "node scripts/e2e-bots.mjs",
+    "e2e:torneo": "npm run build && node scripts/e2e-torneo.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -10,8 +10,7 @@ import {
 } from '@domino/shared';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { sfx } from '../audio/sfx';
-import { actions, leaveRoom } from '../net/client';
-import { navigate } from '../net/router';
+import { actions, exitRoom } from '../net/client';
 import { Avatar } from '../ui/Avatar';
 import { DoorIcon, SpeakerIcon, SpeakerOffIcon } from '../ui/icons';
 import { FullscreenButton } from '../ui/FullscreenButton';
@@ -296,14 +295,7 @@ function TableControls() {
       </button>
       {confirmLeave ? (
         <span className="leave-confirm">
-          <button
-            type="button"
-            className="btn danger small"
-            onClick={() => {
-              leaveRoom();
-              navigate('/');
-            }}
-          >
+          <button type="button" className="btn danger small" onClick={exitRoom}>
             Salir
           </button>
           <button type="button" className="btn ghost small" onClick={() => setConfirmLeave(false)}>

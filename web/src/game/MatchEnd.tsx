@@ -1,7 +1,7 @@
 import type { RoomView, Team } from '@domino/shared';
 import { Fragment, useState } from 'react';
-import { actions, leaveRoom } from '../net/client';
-import { navigate } from '../net/router';
+import { actions, exitRoom } from '../net/client';
+import { CheckIcon } from '../ui/icons';
 import { derive } from './derive';
 import { HandBreakdown } from './HandBreakdown';
 import { verdictOf } from './verdict';
@@ -24,7 +24,10 @@ export function MatchEnd({ view }: { view: RoomView }) {
   return (
     <div className="overlay match-overlay">
       <div className="card overlay-card match-card" role="dialog" aria-label="Fin de la partida">
-        <p className="eyebrow">Fin de la partida · a {g.target}</p>
+        <p className="eyebrow">
+          Fin de la partida · a {g.target}
+          {view.tournament && ` · Partido ${view.tournament.number} del torneo`}
+        </p>
         <h2 className="title big-title">
           {weWon ? '¡Ganamos!' : `Ganaron ${d.teamNames(winner)}`}
         </h2>
@@ -52,42 +55,58 @@ export function MatchEnd({ view }: { view: RoomView }) {
             <HandBreakdown result={view.handResult} d={d} />
           </div>
         )}
-        <div className="rematch-row">
-          {isHost ? (
-            <>
-              <button
-                type="button"
-                className="btn primary"
-                disabled={busy}
-                onClick={() => void rematch(true)}
-              >
-                Revancha · mismas parejas
-              </button>
-              <button
-                type="button"
-                className="btn secondary"
-                disabled={busy}
-                onClick={() => void rematch(false)}
-              >
-                Revancha · sortear parejas
-              </button>
-            </>
-          ) : (
-            <p className="muted">
-              Esperando a que {d.host?.name ?? 'el anfitrión'} pida la revancha…
+        {view.tournament && (
+          <div className="rematch-row">
+            <p className={`saved-note ${view.tournament.saved ? 'is-saved' : ''}`} role="status">
+              {view.tournament.saved ? (
+                <>
+                  <CheckIcon size={18} /> Partido guardado
+                </>
+              ) : (
+                'Guardando el resultado…'
+              )}
             </p>
-          )}
-          <button
-            type="button"
-            className="btn ghost small"
-            onClick={() => {
-              leaveRoom();
-              navigate('/');
-            }}
-          >
-            Salir de la sala
-          </button>
-        </div>
+            <button
+              type="button"
+              className="btn primary"
+              disabled={!view.tournament.saved}
+              onClick={exitRoom}
+            >
+              Volver al torneo
+            </button>
+          </div>
+        )}
+        {!view.tournament && (
+          <div className="rematch-row">
+            {isHost ? (
+              <>
+                <button
+                  type="button"
+                  className="btn primary"
+                  disabled={busy}
+                  onClick={() => void rematch(true)}
+                >
+                  Revancha · mismas parejas
+                </button>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  disabled={busy}
+                  onClick={() => void rematch(false)}
+                >
+                  Revancha · sortear parejas
+                </button>
+              </>
+            ) : (
+              <p className="muted">
+                Esperando a que {d.host?.name ?? 'el anfitrión'} pida la revancha…
+              </p>
+            )}
+            <button type="button" className="btn ghost small" onClick={exitRoom}>
+              Salir de la sala
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

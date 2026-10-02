@@ -1,10 +1,17 @@
 import { useSyncExternalStore } from 'react';
 
-export type Route = { name: 'home' } | { name: 'room'; roomId: string };
+export type Route =
+  | { name: 'home' }
+  | { name: 'room'; roomId: string }
+  | { name: 'torneo-nuevo' }
+  | { name: 'torneo'; id: string };
 
 function parse(pathname: string): Route {
   const m = /^\/sala\/([^/]+)\/?$/i.exec(pathname);
   if (m?.[1]) return { name: 'room', roomId: decodeURIComponent(m[1]).toUpperCase() };
+  if (/^\/torneo\/nuevo\/?$/i.test(pathname)) return { name: 'torneo-nuevo' };
+  const t = /^\/torneo\/([^/]+)\/?$/i.exec(pathname);
+  if (t?.[1]) return { name: 'torneo', id: decodeURIComponent(t[1]).toUpperCase() };
   return { name: 'home' };
 }
 
@@ -35,3 +42,5 @@ export function useRoute(): Route {
 
 export const roomPath = (roomId: string) => `/sala/${roomId}`;
 export const roomUrl = (roomId: string) => `${window.location.origin}${roomPath(roomId)}`;
+export const tournamentPath = (id: string) => `/torneo/${id}`;
+export const tournamentUrl = (id: string) => `${window.location.origin}${tournamentPath(id)}`;

@@ -18,6 +18,7 @@ export function PauseOverlay({ view }: { view: RoomView }) {
             isHost={isHost}
             hostName={d.host?.name ?? 'el anfitrión'}
             roomId={view.roomId}
+            tournament={view.tournament !== undefined}
           />
         ))}
       </div>
@@ -30,11 +31,14 @@ function PauseRow({
   isHost,
   hostName,
   roomId,
+  tournament,
 }: {
   entry: PauseEntry;
   isHost: boolean;
   hostName: string;
   roomId: string;
+  /** Tournament matches have no AI takeover and no replacement seats. */
+  tournament: boolean;
 }) {
   const left = useCountdown(entry.expired ? null : entry.remainingMs);
   const [copied, copy] = useCopied();
@@ -71,14 +75,16 @@ function PauseRow({
             >
               Esperar más
             </button>
-            <button
-              type="button"
-              className="btn secondary"
-              onClick={() => void actions.decide(entry.playerId, 'bot')}
-            >
-              Que juegue la IA
-            </button>
-            {!entry.replaceable && (
+            {!tournament && (
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={() => void actions.decide(entry.playerId, 'bot')}
+              >
+                Que juegue la IA
+              </button>
+            )}
+            {!tournament && !entry.replaceable && (
               <button
                 type="button"
                 className="btn secondary"
@@ -94,6 +100,11 @@ function PauseRow({
             >
               Terminar partida
             </button>
+            {tournament && (
+              <p className="muted small">
+                Si terminas la partida no se guarda nada: se vuelve a jugar desde cero.
+              </p>
+            )}
           </div>
         ) : (
           <p className="muted">

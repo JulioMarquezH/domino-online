@@ -134,4 +134,6 @@ export interface TournamentRoomInfo {
   pairing: Pairing;
   /** True once the result is in the database (the room then shows "Partido guardado"). */
   saved: boolean;
+  /** The four registered players and their fixed seats (so the lobby can say who is missing). */
+  roster: { letter: Letter; name: string; seat: 0 | 1 | 2 | 3 }[];
 }

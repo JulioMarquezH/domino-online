@@ -9,9 +9,10 @@ import {
 import { useSyncExternalStore } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import { voice } from '../voice/voice';
+import { navigate, tournamentPath } from './router';
 import { storage } from './storage';
 
-export type RoomErrorCode = 'NOT_FOUND' | 'GONE' | 'FULL' | 'REPLACED';
+export type RoomErrorCode = 'NOT_FOUND' | 'GONE' | 'FULL' | 'REPLACED' | 'RATE_LIMITED';
 
 export type RoomStatus =
   | { kind: 'idle' }
@@ -30,7 +31,7 @@ export interface ClientState {
 
 type DominoSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
-const socket: DominoSocket = io({
+export const socket: DominoSocket = io({
   transports: ['websocket', 'polling'],
   reconnectionDelay: 500,
   reconnectionDelayMax: 3000,
@@ -56,7 +57,10 @@ export function useClient(): ClientState {
 
 export const getClientState = () => state;
 
-function emitAck<T extends object = object>(event: string, payload?: unknown): Promise<Ack<T>> {
+export function emitAck<T extends object = object>(
+  event: string,
+  payload?: unknown,
+): Promise<Ack<T>> {
   return new Promise((resolve) => {
     const s = socket as unknown as {
       timeout: (ms: number) => { emit: (...args: unknown[]) => void };
@@ -108,10 +112,13 @@ async function doJoin(roomId: string, name?: string): Promise<void> {
   if (state.status.kind !== 'in' || state.status.roomId !== roomId) {
     set({ status: { kind: 'joining', roomId }, view: null });
   }
+  // Tournament rooms admit only the device's tournament identity (or the room token it got).
+  const tournamentId = storage.getRoomTournament(roomId);
   const res = await emitAck<JoinOk>('room:join', {
     roomId,
     token: token ?? undefined,
-    name: savedName,
+    name: tournamentId ? undefined : savedName,
+    tt: (tournamentId && storage.getTournamentToken(tournamentId)) || undefined,
   });
   if (res.ok) {
     onJoined(res, savedName ?? storage.getName());
@@ -126,6 +133,8 @@ async function doJoin(roomId: string, name?: string): Promise<void> {
     });
   } else if (code === 'FULL') {
     set({ view: null, status: { kind: 'error', roomId, code: 'FULL' } });
+  } else if (code === 'RATE_LIMITED') {
+    set({ view: null, status: { kind: 'error', roomId, code: 'RATE_LIMITED' } });
   } else if (code === 'TIMEOUT') {
     // Still offline: the reconnect handler retries.
   } else {
@@ -140,6 +149,13 @@ export function leaveRoom(): void {
   if (s.kind === 'in') storage.clearToken(s.roomId);
   voice.leave();
   set({ status: { kind: 'idle' }, view: null });
+}
+
+/** Leaves the room: a tournament room goes back to its tournament, a casual one to the home. */
+export function exitRoom(): void {
+  const tournamentId = state.view?.tournament?.id ?? null;
+  leaveRoom();
+  navigate(tournamentId ? tournamentPath(tournamentId) : '/');
 }
 
 export function resetStatus(): void {

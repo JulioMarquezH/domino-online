@@ -4,6 +4,8 @@ import { useClient } from './net/client';
 import { useRoute } from './net/router';
 import { Home } from './screens/Home';
 import { RoomRoute } from './screens/RoomRoute';
+import { TournamentCreate } from './screens/TournamentCreate';
+import { TournamentRoute } from './screens/TournamentRoute';
 import { SwipeHint } from './ui/SwipeHint';
 import { TileDefs } from './ui/Tile';
 import { useIosBarHiding } from './ui/useIosBarHiding';
@@ -23,7 +25,10 @@ export function App() {
   return (
     <>
       <TileDefs />
-      {route.name === 'home' ? <Home /> : <RoomRoute roomId={route.roomId} />}
+      {route.name === 'home' && <Home />}
+      {route.name === 'room' && <RoomRoute roomId={route.roomId} />}
+      {route.name === 'torneo-nuevo' && <TournamentCreate />}
+      {route.name === 'torneo' && <TournamentRoute id={route.id} />}
       {inRoom && !connected && (
         <div className="conn-banner" role="status">
           Reconectando…

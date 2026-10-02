@@ -2,13 +2,14 @@ import { NAME_MAX_LENGTH, sanitizeName } from '@domino/shared';
 import { useEffect, useState, type FormEvent } from 'react';
 import { unlockAudio } from '../audio/context';
 import { joinRoom, resetStatus, useClient, type RoomErrorCode } from '../net/client';
-import { navigate } from '../net/router';
+import { navigate, tournamentPath } from '../net/router';
 import { storage } from '../net/storage';
 import { DrawScreen } from '../game/DrawScreen';
 import { PauseOverlay } from '../game/PauseOverlay';
 import { Table } from '../game/Table';
 import { RotateOverlay } from '../ui/RotateOverlay';
 import { Lobby } from './Lobby';
+import { TournamentLobby } from './TournamentLobby';
 
 export function RoomRoute({ roomId }: { roomId: string }) {
   const { status, view } = useClient();
@@ -24,13 +25,14 @@ export function RoomRoute({ roomId }: { roomId: string }) {
     return <Loading text="Entrando a la sala…" />;
   }
   if (status.kind === 'needName') return <NamePrompt roomId={roomId} error={status.error} />;
-  if (status.kind === 'error') return <RoomError code={status.code} />;
+  if (status.kind === 'error') return <RoomError code={status.code} roomId={roomId} />;
   if (!view) return <Loading text="Entrando a la sala…" />;
 
   const inGame = view.phase !== 'lobby';
   return (
     <>
-      {view.phase === 'lobby' && <Lobby view={view} />}
+      {view.phase === 'lobby' &&
+        (view.tournament ? <TournamentLobby view={view} /> : <Lobby view={view} />)}
       {view.phase === 'draw' && <DrawScreen view={view} />}
       {(view.phase === 'playing' || view.phase === 'handEnd' || view.phase === 'matchEnd') && (
         <Table view={view} />
@@ -123,25 +125,34 @@ const ERRORS: Record<RoomErrorCode, { title: string; text: string }> = {
     title: 'Abriste la sala en otra pestaña',
     text: 'Sigue jugando desde la otra ventana o vuelve a entrar aquí.',
   },
+  RATE_LIMITED: {
+    title: 'Demasiados intentos',
+    text: 'Espera unos minutos y vuelve a entrar desde el torneo.',
+  },
 };
 
-function RoomError({ code }: { code: RoomErrorCode }) {
+function RoomError({ code, roomId }: { code: RoomErrorCode; roomId: string }) {
   const e = ERRORS[code];
+  const tournamentId = storage.getRoomTournament(roomId);
   return (
     <div className="screen center-screen">
       <div className="card narrow-card error-card">
         <h1 className="title">{e.title}</h1>
-        <p className="muted">{e.text}</p>
+        <p className="muted">
+          {tournamentId && code !== 'REPLACED'
+            ? 'Si el partido no había terminado no se guardó: se vuelve a jugar desde cero.'
+            : e.text}
+        </p>
         <div className="row">
           <button
             type="button"
             className="btn primary"
             onClick={() => {
               resetStatus();
-              navigate('/');
+              navigate(tournamentId ? tournamentPath(tournamentId) : '/');
             }}
           >
-            Volver al inicio
+            {tournamentId ? 'Volver al torneo' : 'Volver al inicio'}
           </button>
           {code === 'REPLACED' && (
             <button

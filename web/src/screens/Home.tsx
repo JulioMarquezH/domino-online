@@ -5,11 +5,13 @@ import {
   isValidRoomId,
   sanitizeName,
 } from '@domino/shared';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { unlockAudio } from '../audio/context';
 import { createRoom } from '../net/client';
-import { navigate, roomPath } from '../net/router';
-import { storage } from '../net/storage';
+import { navigate, roomPath, tournamentPath } from '../net/router';
+import { storage, type KnownTournament } from '../net/storage';
+import { refreshKnownTournaments } from '../net/tournament';
+import { TrophyIcon } from '../ui/icons';
 import { TileFace } from '../ui/Tile';
 
 const ALLOWED = new RegExp(`[^${ROOM_ID_ALPHABET}]`, 'g');
@@ -133,8 +135,66 @@ export function Home() {
               {error}
             </p>
           )}
+          {!joining && (
+            <button
+              type="button"
+              className="btn secondary tournament-btn"
+              onClick={() => navigate('/torneo/nuevo')}
+            >
+              <TrophyIcon size={20} /> Torneo
+            </button>
+          )}
+          <KnownTournaments />
         </div>
       </main>
     </div>
+  );
+}
+
+/** "Tus torneos": the IDs this device opened, checked against the server (dead ones vanish). */
+function KnownTournaments() {
+  const [list, setList] = useState<KnownTournament[]>(() => storage.getKnownTournaments());
+  const [progress, setProgress] = useState<Record<string, { status: string; played: number }>>({});
+
+  useEffect(() => {
+    let alive = true;
+    void refreshKnownTournaments().then((items) => {
+      if (!alive) return;
+      setList(storage.getKnownTournaments());
+      setProgress(Object.fromEntries(items.map((i) => [i.id, i])));
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  if (list.length === 0) return null;
+  return (
+    <section className="known-tournaments" aria-labelledby="known-title">
+      <h2 id="known-title" className="eyebrow">
+        Tus torneos
+      </h2>
+      <ul>
+        {list.map((t) => {
+          const p = progress[t.id];
+          return (
+            <li key={t.id}>
+              <button
+                type="button"
+                className="known-item"
+                onClick={() => navigate(tournamentPath(t.id))}
+                data-tournament={t.id}
+              >
+                <span className="known-label">{t.label || t.id}</span>
+                <span className="muted small">
+                  {t.you ? `Juegas como ${t.you}` : 'Aún no has entrado'}
+                  {p ? ` · ${p.status === 'finished' ? 'Terminado' : `${p.played}/12`}` : ''}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
