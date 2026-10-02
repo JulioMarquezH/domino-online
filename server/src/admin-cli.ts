@@ -37,7 +37,9 @@ function parseArgs(argv: string[]) {
   const flags: Record<string, string> = {};
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i] as string;
-    if (a.startsWith('--')) {
+    if (a === '--help' || a === '-h') {
+      positional.push('help');
+    } else if (a.startsWith('--')) {
       const value = argv[i + 1];
       if (value === undefined || value.startsWith('--'))
         throw new UsageError(`Falta el valor de ${a}`);

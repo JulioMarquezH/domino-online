@@ -128,5 +128,6 @@ describe('admin script', () => {
     expect(() => runAdmin(['--db', join(dir, 'nope.db'), 'list'], {}, out)).toThrow(/No existe/);
     expect(() => run('explode')).toThrow(UsageError);
     expect(runAdmin([], {}, out)).toBe(1);
+    expect(runAdmin(['--help'], {}, out)).toBe(0);
   });
 });

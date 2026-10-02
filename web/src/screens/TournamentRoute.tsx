@@ -1,7 +1,7 @@
 import { NAME_MAX_LENGTH, cleanPlayerName } from '@domino/shared';
 import { useEffect, useState, type FormEvent } from 'react';
 import { enterTournament, useTournament } from '../net/tournament';
-import { resetStatus } from '../net/client';
+import { getClientState, leaveRoom } from '../net/client';
 import { navigate } from '../net/router';
 import { Loading } from './RoomRoute';
 import { TournamentPage } from './tournament/TournamentPage';
@@ -11,7 +11,8 @@ export function TournamentRoute({ id }: { id: string }) {
   const here = status.kind !== 'idle' && status.id === id;
 
   useEffect(() => {
-    resetStatus(); // never keep a casual room "open" behind a tournament page
+    // Never keep a room "open" behind a tournament page (e.g. after the browser's back button).
+    if (getClientState().status.kind === 'in') leaveRoom();
     void enterTournament(id);
   }, [id]);
 
