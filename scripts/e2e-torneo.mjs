@@ -18,7 +18,6 @@ import { chromium } from 'playwright';
 
 const OUT = 'e2e-artifacts';
 const TARGET = 30;
-const NAMES = ['Ana', 'Beto', 'Caro', 'Dani'];
 const log = (...a) => console.log(`[torneo ${new Date().toISOString().slice(11, 19)}]`, ...a);
 const assert = (cond, msg) => {
   if (!cond) throw new Error(`ASSERT: ${msg}`);
