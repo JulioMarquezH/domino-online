@@ -6,3 +6,5 @@ export * from './hand';
 export * from './match';
 export * from './ai';
 export * from './protocol';
+export * from './tournament';
+export * from './tournament-protocol';

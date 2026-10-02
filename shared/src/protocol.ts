@@ -7,6 +7,12 @@ import type { End, GameEvent, PlacedTile, TeamPips } from './hand';
 import type { Target } from './match';
 import type { Seat, Team } from './seats';
 import type { TileId } from './tiles';
+import type { Letter } from './tournament';
+import type {
+  TournamentClientToServer,
+  TournamentRoomInfo,
+  TournamentServerToClient,
+} from './tournament-protocol';
 
 /** Unambiguous alphabet: no 0/O/1/I/L. */
 export const ROOM_ID_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -51,6 +57,8 @@ export interface PublicPlayer {
   voiceSession: string | null;
   /** Tiles left in hand during a hand; 0 otherwise. */
   tileCount: number;
+  /** Tournament rooms only: the player's fixed letter. */
+  letter?: Letter;
 }
 
 export interface DrawPickView {
@@ -128,6 +136,8 @@ export interface RoomView {
   /** Non-empty while the game is paused waiting for disconnected players. */
   pause: PauseEntry[];
   matchWinner: Team | null;
+  /** Present only in tournament rooms; casual rooms never carry it. */
+  tournament?: TournamentRoomInfo;
 }
 
 /** What the host can do once a disconnected player's 2 minutes are up. */
@@ -136,7 +146,14 @@ export type PauseDecision = 'wait' | 'end' | 'replace' | 'bot';
 export const MAX_BOTS = 3;
 export const BOT_NAMES = ['Rosa', 'Tomás', 'Lucho', 'Marta', 'Chepe', 'Nena', 'Toño', 'Chela'];
 
-export type JoinErrorCode = 'NOT_FOUND' | 'FULL' | 'NAME_TAKEN' | 'NAME_INVALID' | 'NEED_NAME';
+export type JoinErrorCode =
+  | 'NOT_FOUND'
+  | 'FULL'
+  | 'NAME_TAKEN'
+  | 'NAME_INVALID'
+  | 'NEED_NAME'
+  /** Tournament rooms: not one of the four registered players. */
+  | 'FORBIDDEN';
 export type ActionErrorCode =
   | 'NOT_IN_ROOM'
   | 'NOT_HOST'
@@ -150,9 +167,12 @@ export type ActionErrorCode =
   | 'ILLEGAL_MOVE'
   | 'END_REQUIRED'
   | 'CANNOT_PASS'
-  | 'TAKEN';
+  | 'TAKEN'
+  /** Tournament rooms: the host cannot change target/teams, add AIs, replace players or rematch. */
+  | 'LOCKED';
 
-export type Ack<T = object> = ({ ok: true } & T) | { ok: false; code: string };
+export type Ack<T = object> =
+  ({ ok: true } & T) | { ok: false; code: string; retryAfterMs?: number };
 
 export interface JoinOk {
   roomId: string;
@@ -175,10 +195,10 @@ export interface SignalPayload {
   reset?: boolean;
 }
 
-export interface ClientToServerEvents {
+export interface ClientToServerEvents extends TournamentClientToServer {
   'room:create': (p: { name: string }, ack: (r: Ack<JoinOk>) => void) => void;
   'room:join': (
-    p: { roomId: string; name?: string; token?: string },
+    p: { roomId: string; name?: string; token?: string; tt?: string },
     ack: (r: Ack<JoinOk>) => void,
   ) => void;
   'room:leave': () => void;
@@ -198,7 +218,7 @@ export interface ClientToServerEvents {
   'rtc:signal': (p: { to: string; toSession: string; data: SignalPayload }) => void;
 }
 
-export interface ServerToClientEvents {
+export interface ServerToClientEvents extends TournamentServerToClient {
   state: (view: RoomView) => void;
   'rtc:signal': (p: { from: string; fromSession: string; data: SignalPayload }) => void;
   /** The room is gone (deleted, match aborted for you, or you opened it elsewhere). */
