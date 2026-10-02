@@ -9,6 +9,12 @@ services:
         required: false
     environment:
       PORT: 3000
+      DATABASE_PATH: /data/domino.db
+    # Tournaments live in SQLite: the data survives rebuilds and container recreation.
+    # The host directories must be writable by the container's `node` user (uid 1000).
+    volumes:
+      - ./data:/data
+      - ./backups:/backups
     # Only reachable through Caddy on the same host.
     ports:
       - '127.0.0.1:8020:3000'

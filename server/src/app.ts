@@ -48,7 +48,11 @@ export function createApp(options: AppOptions): App {
       res.writeHead(200, { 'content-type': 'text/plain' }).end('ok');
       return;
     }
-    if (req.url === '/_stats' && isLocalRequest(req)) {
+    if (req.url === '/_stats' && !isLocalRequest(req)) {
+      res.writeHead(404).end(); // never reachable through Caddy
+      return;
+    }
+    if (req.url === '/_stats') {
       res.writeHead(200, { 'content-type': 'application/json' }).end(
         JSON.stringify({
           rooms: rooms.size,
