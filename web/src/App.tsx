@@ -2,6 +2,7 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { isAudioRunning, onAudioStateChange, unlockAudio } from './audio/context';
 import { useClient } from './net/client';
 import { useRoute } from './net/router';
+import { useTournament } from './net/tournament';
 import { Home } from './screens/Home';
 import { RoomRoute } from './screens/RoomRoute';
 import { TournamentCreate } from './screens/TournamentCreate';
@@ -16,6 +17,7 @@ export function App() {
   const route = useRoute();
   const { connected, status } = useClient();
   const inRoom = status.kind === 'in';
+  const inTournament = useTournament().status.kind === 'in';
   const showSwipeHint = useIosBarHiding();
 
   useEffect(() => {
@@ -29,7 +31,7 @@ export function App() {
       {route.name === 'room' && <RoomRoute roomId={route.roomId} />}
       {route.name === 'torneo-nuevo' && <TournamentCreate />}
       {route.name === 'torneo' && <TournamentRoute id={route.id} />}
-      {inRoom && !connected && (
+      {(inRoom || inTournament) && !connected && (
         <div className="conn-banner" role="status">
           Reconectando…
         </div>
