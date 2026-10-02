@@ -34,3 +34,28 @@ export class FakeClock implements Clock {
     this.t = end;
   }
 }
+
+/** Drives a started room to its end with random legal moves for whoever's turn it is. */
+export async function playRoomToEnd(
+  room: import('../src/room').Room,
+  playerIds: string[],
+  clock: FakeClock,
+  nextHandMs: number,
+  rng: () => number,
+): Promise<void> {
+  const { legalMoves } = await import('@domino/shared');
+  for (let guard = 0; guard < 4000 && room.phase !== 'matchEnd'; guard++) {
+    if (room.phase === 'handEnd') {
+      clock.advance(nextHandMs);
+      continue;
+    }
+    const turn = room.viewFor(playerIds[0] as string).game?.turn;
+    const id = playerIds.find((p) => room.getPlayer(p)?.seat === turn) as string;
+    const mine = room.viewFor(id).game;
+    if (!mine) throw new Error('no game');
+    const moves = legalMoves(mine.hand, mine.line);
+    const move = moves[Math.floor(rng() * moves.length)];
+    const r = move ? room.play(id, move.tile, move.end, room.version) : room.pass(id, room.version);
+    if (!r.ok) throw new Error(`move rejected: ${r.code}`);
+  }
+}

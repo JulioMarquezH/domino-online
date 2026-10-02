@@ -613,6 +613,8 @@ export class Room {
       hooks.record(outcome);
       this.saved = true;
       this.clearTimer('save');
+      // The room may have been waiting only for this write before it can expire.
+      this.scheduleEmptyCheck();
     } catch (error) {
       const delay = saveRetryDelay(this.saveAttempts++);
       console.error(

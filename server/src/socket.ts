@@ -7,10 +7,8 @@ import {
   normalizeRoomId,
   sanitizeName,
   type Ack,
-  type ClientToServerEvents,
   type JoinOk,
   type RTCIceServerConfig,
-  type ServerToClientEvents,
   type SignalPayload,
 } from '@domino/shared';
 import { BOT_SOCKET, isValidToken, type Result, type Room, type TournamentIdentity } from './room';
