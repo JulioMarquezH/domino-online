@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "PORT=${SERVER_PORT:-3001} tsx watch --clear-screen=false src/index.ts",
-    "build": "esbuild src/index.ts --bundle --platform=node --target=node22 --format=esm --packages=external --alias:@domino/shared=../shared/src/index.ts --outfile=dist/index.js",
-    "start": "NODE_ENV=production node dist/index.js"
+    "build": "esbuild src/index.ts src/admin.ts --bundle --platform=node --target=node22 --format=esm --packages=external --alias:@domino/shared=../shared/src/index.ts --outdir=dist",
+    "start": "NODE_ENV=production node dist/index.js",
+    "admin": "tsx src/admin.ts"
   },
   "dependencies": {
     "socket.io": "^4.8.4"
