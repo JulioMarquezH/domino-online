@@ -12,3 +12,10 @@ test-results/
 playwright-report/
 e2e-artifacts/
 .claude/
+
+# SQLite database and backups (never commit data)
+data/
+backups/
+*.db
+*.db-wal
+*.db-shm
