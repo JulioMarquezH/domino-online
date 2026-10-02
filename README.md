@@ -2,12 +2,14 @@
 
 Dominó 2 contra 2 en tiempo real, en el navegador, con salas privadas (por código o enlace) y
 **chat de voz siempre abierto** entre los cuatro jugadores. Funciona en el teléfono (en horizontal)
-y en el computador. Sin cuentas, sin base de datos.
+y en el computador. Sin cuentas. Las salas viven en memoria; solo los **torneos** se guardan en
+una base SQLite.
 
 - `shared/` — motor del juego puro en TypeScript (reglas, sorteo, jugadas, tranque, puntaje). RNG
   inyectable para tests deterministas.
 - `server/` — Node + Socket.IO. Servidor autoritativo (el cliente solo manda intenciones) y
-  relevo de señalización WebRTC. Las salas viven en memoria.
+  relevo de señalización WebRTC. Las salas viven en memoria; los torneos, en SQLite
+  (`node:sqlite`, sin dependencias nativas).
 - `web/` — React + Vite. Voz WebRTC en malla (máx. 6 conexiones).
 
 ## Reglas de la casa
@@ -31,6 +33,19 @@ Son las reglas de Julio, **no** las "estándar":
   queda **0–0** y se sigue con la siguiente.
 - Gana la partida la primera pareja en llegar a la meta: **100**, 150 o 200.
 
+## Torneo
+
+Una liga privada para **cuatro jugadores fijos** (letras A–D sorteadas por el servidor): 12
+partidos en 4 jornadas, resultado guardado solo al terminar cada partida, tabla con desempates y
+respaldo diario a Google Drive. Se crea desde el inicio con **Torneo**; cada jugador entra con el
+enlace `/torneo/<ID>` escribiendo su nombre (sin PIN ni cuentas: el ID es el único secreto).
+Las reglas completas (puntos, zapatero, calendario, desempates, cómo se guarda y cómo se corrige)
+están en [docs/TORNEO.md](docs/TORNEO.md).
+
+Los registros de partidos son **inmutables** (triggers de SQLite) y la tabla siempre se calcula a
+partir de ellos. Para corregir algo hay un script de administración en el servidor
+(`npm run admin -w server -- --help`) que anula partidos con motivo y deja todo en `admin_audit`.
+
 ## Jugar con la IA
 
 En la sala, el anfitrión puede pulsar **Agregar IA** en los puestos vacíos: se juega 3 personas
@@ -46,7 +61,7 @@ que en promedio da más puntos a su pareja (`shared/src/ai.ts`).
 
 ## Correr en local
 
-Requisitos: Node 24 (ver `.nvmrc`).
+Requisitos: Node 24 (ver `.nvmrc`; el mínimo es 22.13 por `node:sqlite`).
 
 ```bash
 nvm use
@@ -57,20 +72,25 @@ npm run dev
 Abre <http://localhost:5173>. El servidor corre en el puerto 3001 y Vite le hace de proxy a
 Socket.IO.
 
-| Comando             | Qué hace                                           |
-| ------------------- | -------------------------------------------------- |
-| `npm test`          | Tests (motor, sala, integración Socket.IO, layout) |
-| `npm run lint`      | ESLint + Prettier                                  |
-| `npm run typecheck` | TypeScript estricto en los 3 paquetes              |
-| `npm run build`     | Build del web y bundle del servidor                |
-| `npm start`         | Producción: un solo puerto sirve web + Socket.IO   |
-| `npm run e2e`       | Partida completa con 4 navegadores (ver abajo)     |
-| `npm run e2e:bots`  | Una persona contra 3 IAs, por la interfaz          |
+| Comando                                | Qué hace                                                       |
+| -------------------------------------- | -------------------------------------------------------------- |
+| `npm test`                             | Tests (motor, sala, integración Socket.IO, layout)             |
+| `npm run lint`                         | ESLint + Prettier                                              |
+| `npm run typecheck`                    | TypeScript estricto en los 3 paquetes                          |
+| `npm run build`                        | Build del web y bundle del servidor                            |
+| `npm start`                            | Producción: un solo puerto sirve web + Socket.IO               |
+| `npm run e2e`                          | Partida completa con 4 navegadores (ver abajo)                 |
+| `npm run e2e:bots`                     | Una persona contra 3 IAs, por la interfaz                      |
+| `npm run e2e:torneo`                   | Torneo completo con 4 navegadores (levanta su propio servidor) |
+| `npm run admin -w server -- <comando>` | Administración del torneo (ver docs/TORNEO.md)                 |
 
-Variables de entorno del servidor (ver `.env.example`): `PORT`, `ICE_SERVERS` (JSON con
+Variables de entorno del servidor (ver `.env.example`): `PORT`, `DATABASE_PATH` (archivo SQLite de
+los torneos; por defecto `./data/domino.db`, que está en `.gitignore`; en Docker es `/data/domino.db`),
+`TRUST_PROXY` (creer `X-Forwarded-For` para los límites por IP; automático en producción), `ICE_SERVERS` (JSON con
 servidores STUN/TURN; por defecto solo el STUN público de Google) y, opcionalmente, `TURN_URLS` +
 `TURN_SECRET` para un coturn con credenciales temporales. `PAUSE_MS` cambia la espera por
-desconexión (2 minutos por defecto; solo para pruebas).
+desconexión (2 minutos por defecto; solo para pruebas). `TOURNAMENT_TARGET_TEST=30` acorta los
+partidos de torneo para las pruebas y se **ignora** si `NODE_ENV=production`.
 
 ## Probar con 4 jugadores
 
@@ -111,4 +131,5 @@ puedes jugar y escuchar, pero no hablar.
 ## Producción
 
 Ver [docs/DEPLOY.md](docs/DEPLOY.md): una imagen Docker pequeña (un proceso Node que sirve el web
-y Socket.IO en un solo puerto) detrás de Caddy.
+y Socket.IO en un solo puerto) detrás de Caddy, con la base de datos en un volumen
+(`/opt/domino/data`) y copias diarias a Google Drive.
