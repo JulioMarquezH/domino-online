@@ -8,6 +8,7 @@
  */
 import { shuffle, type Rng } from './rng';
 import type { Target } from './match';
+import { ROOM_ID_ALPHABET } from './protocol';
 
 export const LETTERS = ['A', 'B', 'C', 'D'] as const;
 export type Letter = (typeof LETTERS)[number];
@@ -292,4 +293,17 @@ export function standingsText(rows: readonly StandingRow[], played: number): str
     ...lines,
     `Partidos: ${played}/${TOTAL_MATCHES}`,
   ].join('\n');
+}
+
+/** Syntax check for a tournament ID (does not say whether it exists). */
+export function isValidTournamentId(id: unknown): id is string {
+  return (
+    typeof id === 'string' &&
+    id.length === TOURNAMENT_ID_LENGTH &&
+    [...id].every((c) => ROOM_ID_ALPHABET.includes(c))
+  );
+}
+
+export function normalizeTournamentId(raw: string): string {
+  return raw.trim().toUpperCase();
 }
