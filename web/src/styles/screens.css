@@ -1126,3 +1126,9 @@
     flex: none;
   }
 }
+
+/* battery & heat (see base.css) */
+.draw-players .your-move {
+  animation-iteration-count: 4;
+  will-change: opacity;
+}

@@ -738,3 +738,44 @@ html.in-room .audio-unlock {
   bottom: auto;
   top: 38%;
 }
+
+/* ───────────── battery & heat ─────────────
+   A phone heats up when the page repaints every frame. Decorative pulses now play a few times
+   and stop, only animate compositor-friendly properties (opacity / transform), and the costly
+   effects (backdrop blur, blend modes) are gone. The state they show stays visible statically. */
+body::before {
+  mix-blend-mode: normal;
+  opacity: 0.035;
+}
+
+.card {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background:
+    linear-gradient(180deg, rgba(255, 244, 214, 0.05), rgba(255, 244, 214, 0) 40%),
+    rgba(12, 28, 23, 0.94);
+}
+
+.overlay {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: rgba(2, 9, 7, 0.78);
+}
+
+.avatar.is-active {
+  animation: none;
+  outline: 2px solid var(--brass-hi);
+  outline-offset: 4px;
+}
+
+.hero-tile {
+  will-change: translate;
+}
+
+.audio-unlock {
+  animation-iteration-count: 3;
+}
+
+.swipe-hint {
+  will-change: translate, opacity;
+}

@@ -434,7 +434,8 @@ try {
   assert(lines[0] === '📊 *TABLA*', `clipboard header: ${lines[0]}`);
   assert(lines[1] === 'Jugador | PJ | PG | Zap | Pts | Avg', `clipboard columns: ${lines[1]}`);
   assert(lines.length === 7 && lines.at(-1) === 'Partidos: 1/12', `clipboard rows: ${text}`);
-  assert(/\| (1|1\.5) \| (1\.00|1\.50)$/.test(lines[2]), `first row is a winner: ${lines[2]}`);
+  // Avg = summed point difference: the winners are positive.
+  assert(/\| (1|1\.5) \| \+\d+$/.test(lines[2]), `first row is a winner: ${lines[2]}`);
   log(`Copiar tabla →\n${text}`);
 
   const [download] = await Promise.all([
