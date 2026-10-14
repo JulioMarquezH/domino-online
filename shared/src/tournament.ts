@@ -191,15 +191,16 @@ export interface StandingRow {
   zapReceived: number;
   /** 0.5 steps, exact in floating point. */
   pts: number;
-  /** pts ÷ pj, 0 when nobody has played yet. */
+  /**
+   * Point difference: for every match played, own pair's score minus the rivals' score, summed.
+   * 110-70, 20-105 and 135-80 give (+40) + (−85) + (+55) = +10.
+   */
   avg: number;
 }
 
 type Totals = Omit<StandingRow, 'rank'>;
 
 function compareAvg(a: Totals, b: Totals): number {
-  // Cross-multiplied so equal averages compare equal without float noise.
-  if (a.pj > 0 && b.pj > 0) return a.pts * b.pj - b.pts * a.pj;
   return a.avg - b.avg;
 }
 
@@ -245,10 +246,13 @@ export function computeStandings(
     const pts = winnerPoints(m);
     pairs.forEach((pair, i) => {
       const won = m.winnerPair === i + 1;
+      const own = i === 0 ? m.scorePair1 : m.scorePair2;
+      const rival = i === 0 ? m.scorePair2 : m.scorePair1;
       for (const letter of pair) {
         const t = totals.get(letter);
         if (!t) continue;
         t.pj += 1;
+        t.avg += own - rival;
         if (won) {
           t.pg += 1;
           t.pts += pts;
@@ -260,7 +264,6 @@ export function computeStandings(
     });
   }
   const rows = [...totals.values()];
-  for (const t of rows) t.avg = t.pj > 0 ? t.pts / t.pj : 0;
   rows.sort(compareStandingRows);
   const ranked: StandingRow[] = [];
   rows.forEach((t, i) => {
@@ -276,7 +279,8 @@ export function championsOf(rows: readonly StandingRow[]): Letter[] {
   return rows.filter((r) => r.rank === 1).map((r) => r.letter);
 }
 
-export const formatAvg = (avg: number): string => avg.toFixed(2);
+/** Signed point difference: +10, −85, 0. */
+export const formatAvg = (avg: number): string => (avg > 0 ? `+${avg}` : String(avg));
 /** At most one decimal: 3, 3.5. */
 export const formatPts = (pts: number): string =>
   Number.isInteger(pts) ? String(pts) : pts.toFixed(1);

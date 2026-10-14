@@ -552,3 +552,11 @@
 .saved-note.is-saved {
   color: var(--speak);
 }
+
+.avg-pos {
+  color: var(--speak);
+}
+
+.avg-neg {
+  color: #ffb3a6;
+}

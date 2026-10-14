@@ -184,13 +184,13 @@ describe('scoring', () => {
   it('gives each winner 1 point (1.5 on a zapatero) and the losers 0', () => {
     const rows = computeStandings(PLAYERS, [match('AB-CD', 1, 40)]);
     const by = Object.fromEntries(rows.map((r) => [r.letter, r]));
-    expect(by.A).toMatchObject({ pj: 1, pg: 1, pts: 1, zap: 0, zapReceived: 0, avg: 1 });
+    expect(by.A).toMatchObject({ pj: 1, pg: 1, pts: 1, zap: 0, zapReceived: 0, avg: 60 });
     expect(by.B).toMatchObject({ pj: 1, pg: 1, pts: 1 });
-    expect(by.C).toMatchObject({ pj: 1, pg: 0, pts: 0, avg: 0 });
+    expect(by.C).toMatchObject({ pj: 1, pg: 0, pts: 0, avg: -60 });
 
     const zap = computeStandings(PLAYERS, [match('AB-CD', 2, 0)]);
     const z = Object.fromEntries(zap.map((r) => [r.letter, r]));
-    expect(z.C).toMatchObject({ pg: 1, pts: 1.5, zap: 1, avg: 1.5 });
+    expect(z.C).toMatchObject({ pg: 1, pts: 1.5, zap: 1, avg: 100 });
     expect(z.D).toMatchObject({ pg: 1, pts: 1.5, zap: 1 });
     expect(z.A).toMatchObject({ pg: 0, pts: 0, zapReceived: 1 });
     expect(z.B).toMatchObject({ zapReceived: 1 });
@@ -215,6 +215,33 @@ describe('scoring', () => {
     expect(by.A?.zapReceived).toBe(0);
   });
 
+  it("Avg is the summed point difference of every match (Julio's example: +10)", () => {
+    // Julio (A) plays 110-70, 20-105 and 135-80: (+40) + (−85) + (+55) = +10.
+    const rows = computeStandings(PLAYERS, [
+      { jornada: 1, slot: 1, pairing: 'AB-CD', winnerPair: 1, scorePair1: 110, scorePair2: 70 },
+      { jornada: 1, slot: 2, pairing: 'AC-BD', winnerPair: 2, scorePair1: 20, scorePair2: 105 },
+      { jornada: 1, slot: 3, pairing: 'AD-BC', winnerPair: 1, scorePair1: 135, scorePair2: 80 },
+    ]);
+    const by = Object.fromEntries(rows.map((r) => [r.letter, r]));
+    expect(by.A?.avg).toBe(10);
+    // B: +40, then on the winning side of AC-BD (+85), then −55 = +70.
+    expect(by.B?.avg).toBe(70);
+    expect(rows.reduce((sum, r) => sum + r.avg, 0)).toBe(0);
+  });
+
+  it('matches the first real jornada (Julio, Oscar, Jesus, Stephan)', () => {
+    const rows = computeStandings(PLAYERS, [
+      { jornada: 1, slot: 1, pairing: 'AD-BC', winnerPair: 1, scorePair1: 103, scorePair2: 76 },
+      { jornada: 1, slot: 2, pairing: 'AC-BD', winnerPair: 1, scorePair1: 133, scorePair2: 51 },
+      { jornada: 1, slot: 3, pairing: 'AB-CD', winnerPair: 2, scorePair1: 67, scorePair2: 112 },
+    ]);
+    const by = Object.fromEntries(rows.map((r) => [r.letter, r]));
+    expect([by.A?.avg, by.B?.avg, by.C?.avg, by.D?.avg]).toEqual([64, -154, 100, -10]);
+    // Three tied on 2 points: the difference orders them.
+    expect(rows.map((r) => `${r.letter}:${r.rank}`)).toEqual(['C:1', 'A:2', 'D:3', 'B:4']);
+    expect(rows.every((r) => r.zap === 0 && r.zapReceived === 0)).toBe(true);
+  });
+
   it('keeps PJ equal for all four players in a partial tournament', () => {
     const rows = computeStandings(PLAYERS, [
       match('AB-CD', 1, 20),
@@ -236,9 +263,6 @@ function seq(...codes: string[]): PlayedMatch[] {
 }
 
 describe('ranking and tie-breakers', () => {
-  const byLetter = (rows: ReturnType<typeof computeStandings>) =>
-    Object.fromEntries(rows.map((r) => [r.letter, r]));
-
   it('orders by points first', () => {
     // A+B beat C+D; B+D beat A+C: B has 2, A 1, D 1, C 0.
     const rows = computeStandings(PLAYERS, seq('AB-CD:1:10', 'AC-BD:2:10'));
@@ -246,46 +270,25 @@ describe('ranking and tie-breakers', () => {
     expect(rows.map((r) => r.rank)).toEqual([1, 2, 2, 4]);
   });
 
-  it('tie-breaker 1: the higher Avg wins a points tie', () => {
-    // PJ is equal for everybody in a real tournament, so Avg ties exactly when Pts tie; the
-    // comparator is still exercised on rows with different PJ.
-    const row = (letter: 'A' | 'B', pj: number, pts: number) => ({
-      letter,
-      name: letter,
-      pj,
-      pg: 0,
-      zap: 0,
-      zapReceived: 0,
-      pts,
-      avg: pj ? pts / pj : 0,
-    });
-    // A: 3 pts in 2 matches (1.50) beats B: 3 pts in 3 matches (1.00), whatever the letters.
-    expect(compareStandingRows(row('A', 2, 3), row('B', 3, 3))).toBeLessThan(0);
-    expect(compareStandingRows(row('B', 2, 3), row('A', 3, 3))).toBeLessThan(0);
-    expect(compareStandingRows(row('A', 3, 3), row('B', 3, 3))).toBeLessThan(0); // only the letter
+  const row = (
+    letter: 'A' | 'B',
+    fields: Partial<{ pts: number; avg: number; zap: number; zapReceived: number }>,
+  ) => ({ letter, name: letter, pj: 3, pg: 1, zap: 0, zapReceived: 0, pts: 1, avg: 0, ...fields });
+
+  it('tie-breaker 1: the higher Avg (point difference) wins a points tie', () => {
+    expect(compareStandingRows(row('B', { avg: 20 }), row('A', { avg: -5 }))).toBeLessThan(0);
+    expect(compareStandingRows(row('A', { avg: -5 }), row('B', { avg: 20 }))).toBeGreaterThan(0);
+    expect(compareStandingRows(row('A', { avg: 7 }), row('B', { avg: 7 }))).toBeLessThan(0); // only the letter
+    // Points still come first.
+    expect(compareStandingRows(row('B', { pts: 2, avg: -90 }), row('A', { avg: 90 }))).toBeLessThan(
+      0,
+    );
   });
 
-  it('tie-breaker 2: more zapateros won ranks higher on equal points', () => {
-    // A and C both end on 3 points with the same PJ (and Avg); A got there with two zapateros.
-    const rows = computeStandings(
-      PLAYERS,
-      seq(
-        'AB-CD:2:20',
-        'AC-BD:2:20',
-        'AD-BC:1:0',
-        'AB-CD:2:20',
-        'AC-BD:2:0',
-        'AD-BC:2:20',
-        'AB-CD:1:0',
-      ),
-    );
-    const by = byLetter(rows);
-    expect(by.A).toMatchObject({ pts: 3, zap: 2, zapReceived: 1 });
-    expect(by.C).toMatchObject({ pts: 3, zap: 0, zapReceived: 3 });
-    expect(by.A?.pts).toBe(by.C?.pts);
-    expect(by.A?.avg).toBe(by.C?.avg);
-    expect(rows.map((r) => r.letter)).toEqual(['D', 'B', 'A', 'C']);
-    expect(rows.map((r) => r.rank)).toEqual([1, 2, 3, 4]);
+  it('tie-breaker 2: more zapateros won ranks higher on equal points and Avg', () => {
+    const a = row('A', { zap: 0 });
+    const b = row('B', { zap: 2 });
+    expect([a, b].sort(compareStandingRows).map((r) => r.letter)).toEqual(['B', 'A']);
   });
 
   it('tie-breaker 3: fewer zapateros received ranks higher when everything else is equal', () => {
@@ -295,7 +298,7 @@ describe('ranking and tie-breakers', () => {
       pg: 2,
       zap: 1,
       pts: 3.5,
-      avg: 3.5 / 4,
+      avg: 12,
     };
     const a = { ...base, letter: 'B' as const, zapReceived: 0 };
     const b = { ...base, letter: 'A' as const, zapReceived: 2 };
@@ -337,9 +340,10 @@ describe('ranking and tie-breakers', () => {
 });
 
 describe('formatting', () => {
-  it('formats Avg to two decimals and Pts to at most one', () => {
-    expect(formatAvg(1)).toBe('1.00');
-    expect(formatAvg(2.5 / 3)).toBe('0.83');
+  it('formats Avg as a signed difference and Pts to at most one decimal', () => {
+    expect(formatAvg(10)).toBe('+10');
+    expect(formatAvg(-85)).toBe('-85');
+    expect(formatAvg(0)).toBe('0');
     expect(formatPts(3)).toBe('3');
     expect(formatPts(3.5)).toBe('3.5');
   });
@@ -350,9 +354,9 @@ describe('formatting', () => {
     const lines = text.split('\n');
     expect(lines[0]).toBe('📊 *TABLA*');
     expect(lines[1]).toBe('Jugador | PJ | PG | Zap | Pts | Avg');
-    expect(lines[2]).toBe('1. Ana (A) | 1 | 1 | 1 | 1.5 | 1.50');
-    expect(lines[3]).toBe('1. Beto (B) | 1 | 1 | 1 | 1.5 | 1.50');
-    expect(lines[4]).toBe('3. Caro (C) | 1 | 0 | 0 | 0 | 0.00');
+    expect(lines[2]).toBe('1. Ana (A) | 1 | 1 | 1 | 1.5 | +100');
+    expect(lines[3]).toBe('1. Beto (B) | 1 | 1 | 1 | 1.5 | +100');
+    expect(lines[4]).toBe('3. Caro (C) | 1 | 0 | 0 | 0 | -100');
     expect(lines.at(-1)).toBe('Partidos: 1/12');
   });
 });

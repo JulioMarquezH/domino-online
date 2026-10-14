@@ -51,7 +51,9 @@ export function Standings({ rows, youLetter }: { rows: StandingRow[]; youLetter:
               <td>{r.zap}</td>
               <td className="col-secondary">{r.zapReceived}</td>
               <td className="pts">{formatPts(r.pts)}</td>
-              <td>{formatAvg(r.avg)}</td>
+              <td className={r.avg > 0 ? 'avg-pos' : r.avg < 0 ? 'avg-neg' : ''}>
+                {formatAvg(r.avg)}
+              </td>
             </tr>
           ))}
         </tbody>

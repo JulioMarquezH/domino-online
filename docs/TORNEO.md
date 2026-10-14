@@ -72,19 +72,21 @@ posible es 18.
 
 ## Tabla
 
-| Columna | Significado                                                               |
-| ------- | ------------------------------------------------------------------------- |
-| PJ      | partidos jugados                                                          |
-| PG      | partidos ganados                                                          |
-| Zap     | zapateros ganados                                                         |
-| ZapR    | zapateros recibidos (columna secundaria; se oculta en pantallas angostas) |
-| Pts     | puntos                                                                    |
-| Avg     | Pts ÷ PJ, con 2 decimales (0,00 si PJ = 0)                                |
+| Columna | Significado                                                                                  |
+| ------- | -------------------------------------------------------------------------------------------- |
+| PJ      | partidos jugados                                                                             |
+| PG      | partidos ganados                                                                             |
+| Zap     | zapateros ganados                                                                            |
+| ZapR    | zapateros recibidos (columna secundaria; se oculta en pantallas angostas)                    |
+| Pts     | puntos                                                                                       |
+| Avg     | diferencia de puntos: en cada partido, lo que hizo tu pareja menos lo de los rivales, sumado |
+
+**Avg** (ejemplo de Julio): partidos 110-70, 20-105 y 135-80 → (+40) + (−85) + (+55) = **+10**.
+Se muestra con signo (+10, −85, 0).
 
 **Orden:** más Pts; si empatan, (1) mayor Avg, (2) más zapateros ganados, (3) menos zapateros
 recibidos. Si aun así empatan, **quedan empatados** (mismo puesto). No hay desempate 1 contra 1 ni
-resolución manual. Como el PJ es igual para los cuatro, el Avg empata exactamente cuando empatan
-los Pts; igual se aplica primero, como se pidió.
+resolución manual.
 
 Al terminar el partido 12, el torneo queda **cerrado**: aparece el banner de campeón (o
 _"Campeones empatados"_ con todos los primeros puestos) y la tabla final. Un torneo terminado se
@@ -99,10 +101,10 @@ La tabla **nunca se guarda**: siempre se calcula a partir de los partidos regist
   ```
   📊 *TABLA*
   Jugador | PJ | PG | Zap | Pts | Avg
-  1. Ana (A) | 1 | 1 | 1 | 1.5 | 1.50
-  1. Caro (D) | 1 | 1 | 1 | 1.5 | 1.50
-  3. Beto (B) | 1 | 0 | 0 | 0 | 0.00
-  3. Dani (C) | 1 | 0 | 0 | 0 | 0.00
+  1. Ana (A) | 1 | 1 | 1 | 1.5 | +100
+  1. Caro (D) | 1 | 1 | 1 | 1.5 | +100
+  3. Beto (B) | 1 | 0 | 0 | 0 | -100
+  3. Dani (C) | 1 | 0 | 0 | 0 | -100
   Partidos: 1/12
   ```
 
