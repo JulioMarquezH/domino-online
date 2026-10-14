@@ -19,6 +19,7 @@ import {
   type DominoServer,
   type DominoSocket,
 } from './tournament-socket';
+import { TournamentVoice } from './tournament-voice';
 import type { TournamentService } from './tournaments';
 
 export type { DominoServer } from './tournament-socket';
@@ -52,12 +53,17 @@ export function attachSocketHandlers(
   tournaments: TournamentService,
   options: { trustProxy: boolean } = { trustProxy: false },
 ): void {
+  const tournamentVoice = new TournamentVoice();
   io.on('connection', (socket: DominoSocket) => {
     socket.data.roomId = null;
     socket.data.playerId = null;
     socket.data.tournamentId = null;
     const ctx = { ip: clientIp(socket, options.trustProxy), socketId: socket.id };
-    attachTournamentHandlers(socket, tournaments, ctx);
+    attachTournamentHandlers(socket, tournaments, ctx, {
+      io,
+      voice: tournamentVoice,
+      iceServersFor,
+    });
 
     const current = (): { room: Room; playerId: string } | null => {
       const { roomId, playerId } = socket.data;

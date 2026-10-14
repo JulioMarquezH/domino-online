@@ -1,5 +1,8 @@
 import {
+  isLetter,
   isRecord,
+  type RTCIceServerConfig,
+  type SignalPayload,
   type Ack,
   type ClientToServerEvents,
   type ServerToClientEvents,
@@ -8,6 +11,7 @@ import {
   type TournamentExport,
 } from '@domino/shared';
 import type { Server, Socket } from 'socket.io';
+import type { TournamentVoice } from './tournament-voice';
 import type { ClientCtx, TournamentService } from './tournaments';
 
 export interface SocketData {
@@ -37,15 +41,31 @@ export function clientIp(socket: DominoSocket, trustProxy: boolean): string {
   return socket.handshake.address;
 }
 
+const MAX_SIGNAL = 20_000;
+
+export interface TournamentVoiceDeps {
+  io: DominoServer;
+  voice: TournamentVoice;
+  iceServersFor: (id: string) => RTCIceServerConfig[];
+}
+
 export function attachTournamentHandlers(
   socket: DominoSocket,
   service: TournamentService,
   ctx: ClientCtx,
+  deps: TournamentVoiceDeps,
 ): void {
+  const { io, voice } = deps;
+  const announce = (id: string | null) => {
+    if (id) io.to(tournamentChannel(id)).emit('tvoice:members', { id, members: voice.members(id) });
+  };
+  const leaveCall = () => announce(voice.leave(socket.id));
+
   const unsubscribe = () => {
     const id = socket.data.tournamentId;
     if (id) void socket.leave(tournamentChannel(id));
     socket.data.tournamentId = null;
+    leaveCall();
   };
 
   socket.on('tournament:create', (p, ack) => {
@@ -60,14 +80,29 @@ export function attachTournamentHandlers(
       return;
     }
     const res = service.enter({ id: p.id, name: p.name, token: p.token }, ctx);
-    if (!res.ok || !res.id) {
+    if (!res.ok) {
       reply(res);
+      return;
+    }
+    if (!res.id) {
+      reply({ ok: false, code: 'NOT_FOUND' });
       return;
     }
     if (socket.data.tournamentId !== res.id) unsubscribe();
     socket.data.tournamentId = res.id;
     void socket.join(tournamentChannel(res.id));
-    reply({ ok: true, id: res.id, token: res.token, you: res.you, view: res.view });
+    // Into the tournament's call; another device of the same player drops out of it.
+    const replaced = voice.join(res.id, res.you.letter, socket.id);
+    if (replaced) io.to(replaced).emit('tvoice:members', { id: res.id, members: [] });
+    reply({
+      ok: true,
+      id: res.id,
+      token: res.token,
+      you: res.you,
+      view: res.view,
+      iceServers: deps.iceServersFor(`${res.id}:${res.you.letter}`),
+    });
+    announce(res.id);
   });
 
   socket.on('tournament:list', (p, ack) => {
@@ -93,5 +128,28 @@ export function attachTournamentHandlers(
 
   socket.on('tournament:leave', unsubscribe);
 
-  socket.on('disconnect', () => service.forgetSocket(socket.id));
+  socket.on('tvoice:mic', (p) => {
+    if (!isRecord(p) || (p.mic !== 'on' && p.mic !== 'muted' && p.mic !== 'off')) return;
+    announce(voice.setMic(socket.id, p.mic));
+  });
+
+  // Signaling relay inside one tournament's call, only to the target's current session.
+  socket.on('tvoice:signal', (p) => {
+    const id = socket.data.tournamentId;
+    if (!id || !isRecord(p) || !isLetter(p.to) || typeof p.toSession !== 'string') return;
+    if (!isRecord(p.data) || JSON.stringify(p.data).length > MAX_SIGNAL) return;
+    const from = voice.letterOf(id, socket.id);
+    const target = voice.route(id, p.to, p.toSession);
+    if (!from || !target) return;
+    io.to(target).emit('tvoice:signal', {
+      from,
+      fromSession: socket.id,
+      data: p.data as SignalPayload,
+    });
+  });
+
+  socket.on('disconnect', () => {
+    service.forgetSocket(socket.id);
+    leaveCall();
+  });
 }

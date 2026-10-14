@@ -132,7 +132,7 @@ export class TournamentService {
   enter(
     req: { id: unknown; name?: unknown; token?: unknown },
     ctx: ClientCtx,
-  ): Ack<TournamentEntered> & { letter?: Letter; id?: string } {
+  ): Ack<Omit<TournamentEntered, 'iceServers'>> & { letter?: Letter; id?: string } {
     const limited = this.limited(ctx);
     if (limited) return limited;
     const id = typeof req.id === 'string' ? normalizeTournamentId(req.id) : '';

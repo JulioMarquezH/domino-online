@@ -9,6 +9,7 @@ import { downloadJson, nameOf } from './format';
 import { History } from './History';
 import { Schedule } from './Schedule';
 import { Standings } from './Standings';
+import { TournamentCall } from './TournamentCall';
 
 export function TournamentPage({ view, you }: { view: TournamentView; you: LetterAssignment }) {
   const [linkCopied, copyLink] = useCopied();
@@ -87,6 +88,8 @@ export function TournamentPage({ view, you }: { view: TournamentView; you: Lette
       </p>
 
       {finished && <ChampionBanner view={view} />}
+
+      <TournamentCall view={view} you={you} />
 
       <main className="t-grid">
         <section className="card t-standings" aria-labelledby="t-standings-title">

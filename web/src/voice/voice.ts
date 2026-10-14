@@ -1,5 +1,6 @@
-import type { MicState, PublicPlayer, SignalPayload } from '@domino/shared';
-import { getAudioContext } from '../audio/context';
+import type { MicState, SignalPayload } from '@domino/shared';
+import { getAudioContext, onAudioStateChange } from '../audio/context';
+import { isIOS } from '../ui/landscape';
 
 /**
  * Voice chat: a WebRTC full mesh (max 6 connections for 4 players) signaled over Socket.IO,
@@ -25,7 +26,19 @@ export interface VoiceSnapshot {
   audioBlocked: boolean;
 }
 
+/** Someone to keep a voice connection with. `name` keys the volume you chose for them. */
+export interface VoicePeerInfo {
+  id: string;
+  name?: string;
+  connected: boolean;
+  voiceSession: string | null;
+}
+
+/** 'room': a casual room's call. 'tournament': one call for a whole tournament. */
+export type VoiceContext = 'room' | 'tournament';
+
 interface EnterOptions {
+  context: VoiceContext;
   selfId: string;
   iceServers: RTCIceServer[];
   sendSignal: (to: string, toSession: string, data: SignalPayload) => void;
@@ -39,19 +52,42 @@ const AUDIO_CONSTRAINTS: MediaTrackConstraints = {
 };
 
 const SPEAKING_THRESHOLD = 0.018;
-const SPEAKING_HOLD_MS = 350;
+const SPEAKING_HOLD_MS = 400;
+/** Speaking indicators: 6 checks a second is plenty and keeps phones cool. */
+const METER_INTERVAL_MS = 160;
+/** Opus speech is clear at 32 kbps; the default (~64 kbps) costs CPU and battery for nothing. */
+const VOICE_MAX_BITRATE = 32_000;
 const RESTART_AFTER_MS = 4000;
 const HARD_RESET_AFTER_MS = 15000;
 
-const canSetElementVolume = (() => {
+/**
+ * iPhone/iPad Safari ignores HTMLMediaElement.volume (it even reads back the value you set),
+ * so there every voice goes through a Web Audio gain. Elsewhere the element's volume works and
+ * keeps the browser's echo cancellation on its native path.
+ */
+const useWebAudioOutput = isIOS();
+
+const PREFS_KEY = 'domino:voice-prefs';
+type Pref = { volume: number; muted: boolean };
+const DEFAULT_PREF: Pref = { volume: 1, muted: false };
+const nameKey = (name: string) => name.trim().toLocaleLowerCase('es');
+
+function loadPrefs(): Map<string, Pref> {
   try {
-    const a = document.createElement('audio');
-    a.volume = 0.5;
-    return a.volume === 0.5;
+    const raw = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') as Record<string, Pref>;
+    return new Map(Object.entries(raw));
   } catch {
-    return false;
+    return new Map();
   }
-})();
+}
+
+function savePrefs(prefs: Map<string, Pref>): void {
+  try {
+    localStorage.setItem(PREFS_KEY, JSON.stringify(Object.fromEntries(prefs)));
+  } catch {
+    // storage blocked: the choice still applies for this visit
+  }
+}
 
 /** RMS level of a stream through an AnalyserNode. */
 class Meter {
@@ -62,7 +98,7 @@ class Meter {
   constructor(ctx: AudioContext, stream: MediaStream) {
     this.source = ctx.createMediaStreamSource(stream);
     this.analyser = ctx.createAnalyser();
-    this.analyser.fftSize = 512;
+    this.analyser.fftSize = 256;
     this.buf = new Float32Array(this.analyser.fftSize);
     this.source.connect(this.analyser);
   }
@@ -96,6 +132,7 @@ class Peer {
   stream: MediaStream | null = null;
   meter: Meter | null = null;
   gain: GainNode | null = null;
+  name: string | undefined;
   lastSpoke = 0;
   queue: Promise<void> = Promise.resolve();
   timers: ReturnType<typeof setTimeout>[] = [];
@@ -134,6 +171,7 @@ class Peer {
     this.meter?.dispose();
     this.gain?.disconnect();
     this.pc.close();
+    this.audio.pause();
     this.audio.srcObject = null;
     this.audio.remove();
   }
@@ -152,11 +190,18 @@ function audioHost(): HTMLDivElement {
 
 class VoiceManager {
   private opts: EnterOptions | null = null;
+  /** Room player ids that are the same person as a tournament call member ('T:A'). */
+  private aliases = new Map<string, string>();
+  private names = new Map<string, string>();
+  private mix: DynamicsCompressorNode | null = null;
+  /** Peer connections ever created (e2e: a screen change must not rebuild the call). */
+  private created = 0;
   private localStream: MediaStream | null = null;
   private selfMeter: Meter | null = null;
   private selfLastSpoke = 0;
   private peers = new Map<string, Peer>();
-  private prefs = new Map<string, { volume: number; muted: boolean }>();
+  /** Volume/mute you chose for each person, by name, remembered on this device. */
+  private prefs = loadPrefs();
   private loop: ReturnType<typeof setInterval> | null = null;
   private listeners = new Set<() => void>();
   private snap: VoiceSnapshot = {
@@ -177,23 +222,69 @@ class VoiceManager {
 
   getSnapshot = () => this.snap;
 
+  constructor() {
+    // iOS: voices go through Web Audio, which only plays once the context runs (after a tap).
+    if (useWebAudioOutput) {
+      onAudioStateChange(() => {
+        for (const p of this.peers.values()) this.applyOutput(p);
+      });
+    }
+  }
+
+  get context(): VoiceContext | null {
+    return this.opts?.context ?? null;
+  }
+
+  get selfId(): string | null {
+    return this.opts?.selfId ?? null;
+  }
+
   private update(patch: Partial<VoiceSnapshot>): void {
     this.snap = { ...this.snap, ...patch };
+    // Room player ids that are tournament call members see the same speaking/peer state.
+    if (this.aliases.size > 0) {
+      const speaking = { ...this.snap.speaking };
+      const peers = { ...this.snap.peers };
+      for (const [alias, key] of this.aliases) {
+        if (key in speaking) speaking[alias] = speaking[key] as boolean;
+        if (key in peers) peers[alias] = peers[key] as PeerSnapshot;
+      }
+      this.snap = { ...this.snap, speaking, peers };
+    }
     this.listeners.forEach((l) => l());
+  }
+
+  private resolve(id: string): string {
+    return this.aliases.get(id) ?? id;
+  }
+
+  private prefKey(id: string): string {
+    const name = this.names.get(id);
+    return name ? nameKey(name) : id;
+  }
+
+  private prefOf(id: string): Pref {
+    return this.prefs.get(this.prefKey(id)) ?? DEFAULT_PREF;
   }
 
   private refreshPeers(): void {
     const peers: Record<string, PeerSnapshot> = {};
-    for (const p of this.peers.values()) {
-      const pref = this.prefs.get(p.id) ?? { volume: 1, muted: false };
-      peers[p.id] = { conn: p.conn, ...pref };
-    }
+    for (const p of this.peers.values()) peers[p.id] = { conn: p.conn, ...this.prefOf(p.id) };
     this.update({ peers });
+  }
+
+  /** In a tournament room: which room player is which call member (by seat → letter). */
+  setAliases(map: Map<string, string>): void {
+    const same =
+      map.size === this.aliases.size && [...map].every(([k, v]) => this.aliases.get(k) === v);
+    if (same) return;
+    this.aliases = map;
+    this.update({});
   }
 
   // ─── lifecycle ───
   enter(opts: EnterOptions): void {
-    if (this.opts?.selfId === opts.selfId) {
+    if (this.opts?.selfId === opts.selfId && this.opts.context === opts.context) {
       this.opts = opts;
       if (this.snap.mic !== 'pending') opts.sendMic(this.snap.mic);
       return;
@@ -201,12 +292,18 @@ class VoiceManager {
     this.leave();
     this.opts = opts;
     void this.startMic();
-    this.loop = setInterval(() => this.measure(), 100);
+    this.loop = setInterval(() => this.measure(), METER_INTERVAL_MS);
+  }
+
+  /** Hangs up, but only the call of that kind (leaving a tournament room keeps its call). */
+  leaveIf(context: VoiceContext): void {
+    if (this.opts?.context === context) this.leave();
   }
 
   leave(): void {
     for (const p of this.peers.values()) p.close();
     this.peers.clear();
+    this.aliases = new Map();
     this.localStream?.getTracks().forEach((t) => t.stop());
     this.localStream = null;
     this.selfMeter?.dispose();
@@ -270,17 +367,22 @@ class VoiceManager {
     this.opts?.sendMic(mic);
   }
 
-  setVolume(id: string, volume: number): void {
-    const pref = this.prefs.get(id) ?? { volume: 1, muted: false };
-    this.prefs.set(id, { ...pref, volume });
+  /** Your volume for one person only; the others are untouched. Remembered by name. */
+  setVolume(rawId: string, volume: number): void {
+    const id = this.resolve(rawId);
+    const pref = this.prefOf(id);
+    this.prefs.set(this.prefKey(id), { ...pref, volume: Math.max(0, Math.min(1, volume)) });
+    savePrefs(this.prefs);
     const peer = this.peers.get(id);
     if (peer) this.applyOutput(peer);
     this.refreshPeers();
   }
 
-  togglePeerMute(id: string): void {
-    const pref = this.prefs.get(id) ?? { volume: 1, muted: false };
-    this.prefs.set(id, { ...pref, muted: !pref.muted });
+  togglePeerMute(rawId: string): void {
+    const id = this.resolve(rawId);
+    const pref = this.prefOf(id);
+    this.prefs.set(this.prefKey(id), { ...pref, muted: !pref.muted });
+    savePrefs(this.prefs);
     const peer = this.peers.get(id);
     if (peer) this.applyOutput(peer);
     this.refreshPeers();
@@ -297,14 +399,20 @@ class VoiceManager {
   }
 
   // ─── mesh management ───
-  /** Reconciles peer connections with the room's player list. */
-  sync(players: PublicPlayer[], selfId: string): void {
+  /** Reconciles peer connections with who is in the call. */
+  sync(players: VoicePeerInfo[], selfId: string): void {
     const opts = this.opts;
     if (!opts || opts.selfId !== selfId) return;
     const wanted = new Map<string, string>();
+    let renamed = false;
     for (const p of players) {
+      if (p.name && this.names.get(p.id) !== p.name) {
+        this.names.set(p.id, p.name);
+        renamed = true;
+      }
       if (p.id !== selfId && p.connected && p.voiceSession) wanted.set(p.id, p.voiceSession);
     }
+    if (renamed) for (const peer of this.peers.values()) this.applyOutput(peer);
     let changed = false;
     for (const [id, peer] of this.peers) {
       if (wanted.get(id) !== peer.session) {
@@ -319,7 +427,7 @@ class VoiceManager {
         changed = true;
       }
     }
-    if (changed) this.refreshPeers();
+    if (changed || renamed) this.refreshPeers();
   }
 
   handleSignal(from: string, fromSession: string, data: SignalPayload): void {
@@ -347,6 +455,8 @@ class VoiceManager {
     const track = this.localStream?.getAudioTracks()[0] ?? null;
     const live = track && track.readyState === 'live' ? track : null;
     const peer = new Peer(id, session, opts.selfId, opts.iceServers, live, this.localStream);
+    peer.name = this.names.get(id);
+    this.created += 1;
     const send = (data: SignalPayload) => {
       if (!peer.closed) this.opts?.sendSignal(id, session, data);
     };
@@ -435,6 +545,7 @@ class VoiceManager {
       peer.conn = 'connected';
       peer.timers.forEach(clearTimeout);
       peer.timers = [];
+      void this.capBitrate(peer);
       this.refreshPeers();
     } else if (state === 'disconnected') {
       peer.timers.push(
@@ -471,31 +582,62 @@ class VoiceManager {
     );
   }
 
-  /** Volume and local mute. Element volume where supported; Web Audio gain on iOS. */
+  /** Speech doesn't need more than ~32 kbps: less encoding work and data on every phone. */
+  private async capBitrate(peer: Peer): Promise<void> {
+    const sender = peer.transceiver?.sender;
+    if (!sender?.getParameters) return;
+    try {
+      const params = sender.getParameters();
+      if (!params.encodings?.length) params.encodings = [{}];
+      for (const e of params.encodings) e.maxBitrate = VOICE_MAX_BITRATE;
+      await sender.setParameters(params);
+    } catch {
+      // not supported here: keep the browser default
+    }
+  }
+
+  /** The shared output of the Web Audio path: a gentle compressor so no voice blasts over the rest. */
+  private mixBus(ctx: AudioContext): AudioNode {
+    if (!this.mix) {
+      this.mix = ctx.createDynamicsCompressor();
+      this.mix.threshold.value = -18;
+      this.mix.knee.value = 12;
+      this.mix.ratio.value = 3;
+      this.mix.attack.value = 0.01;
+      this.mix.release.value = 0.25;
+      this.mix.connect(ctx.destination);
+    }
+    return this.mix;
+  }
+
+  /** Your volume/mute for this one peer. Element volume where it works; Web Audio gain on iOS. */
   private applyOutput(peer: Peer): void {
-    const pref = this.prefs.get(peer.id) ?? { volume: 1, muted: false };
+    const pref = this.prefOf(peer.id);
+    const level = pref.muted ? 0 : pref.volume;
     const ctx = getAudioContext();
-    const useGain = !canSetElementVolume && pref.volume < 1 && ctx !== null && peer.stream !== null;
-    if (useGain && ctx && peer.stream) {
+    const viaGain =
+      useWebAudioOutput && ctx !== null && ctx.state === 'running' && peer.stream !== null;
+    if (viaGain && ctx && peer.stream) {
       if (!peer.meter) peer.meter = new Meter(ctx, peer.stream);
       if (!peer.gain) {
         peer.gain = ctx.createGain();
-        peer.meter.node.connect(peer.gain).connect(ctx.destination);
+        peer.meter.node.connect(peer.gain).connect(this.mixBus(ctx));
       }
-      peer.gain.gain.value = pref.muted ? 0 : pref.volume;
+      peer.gain.gain.setTargetAtTime(level, ctx.currentTime, 0.03);
+      // The element keeps the stream flowing but stays silent: the gain is what you hear.
       peer.audio.muted = true;
     } else {
       peer.gain?.disconnect();
       peer.gain = null;
       peer.audio.muted = pref.muted;
-      if (canSetElementVolume) peer.audio.volume = pref.volume;
+      peer.audio.volume = pref.volume;
     }
   }
 
   // ─── speaking indicators ───
   private measure(): void {
     const ctx = getAudioContext();
-    if (!ctx || ctx.state !== 'running' || !this.opts) return;
+    if (!ctx || ctx.state !== 'running' || !this.opts || document.hidden) return;
     const now = performance.now();
     const speaking: Record<string, boolean> = {};
 
@@ -510,8 +652,7 @@ class VoiceManager {
       if (!peer.stream) continue;
       if (!peer.meter) peer.meter = new Meter(ctx, peer.stream);
       if (peer.meter.level() > SPEAKING_THRESHOLD) peer.lastSpoke = now;
-      const pref = this.prefs.get(peer.id);
-      speaking[peer.id] = !pref?.muted && now - peer.lastSpoke < SPEAKING_HOLD_MS;
+      speaking[peer.id] = !this.prefOf(peer.id).muted && now - peer.lastSpoke < SPEAKING_HOLD_MS;
     }
 
     const prev = this.snap.speaking;
@@ -522,6 +663,23 @@ class VoiceManager {
         return;
       }
     }
+  }
+
+  /** Debug/e2e helper: what the call looks like from here. */
+  stats() {
+    const peers: Record<
+      string,
+      { state: string; volume: number; muted: boolean; gain: number | null }
+    > = {};
+    for (const p of this.peers.values()) {
+      peers[p.id] = {
+        state: p.pc.connectionState,
+        volume: p.audio.volume,
+        muted: p.audio.muted,
+        gain: p.gain ? p.gain.gain.value : null,
+      };
+    }
+    return { context: this.context, selfId: this.selfId, created: this.created, peers };
   }
 
   /** Debug/e2e helper: connection state of each peer. */

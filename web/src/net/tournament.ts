@@ -7,9 +7,11 @@ import {
   type TournamentExport,
   type TournamentSummary,
   type TournamentView,
+  type TournamentVoiceMember,
 } from '@domino/shared';
 import { useSyncExternalStore } from 'react';
-import { emitAck, socket } from './client';
+import { voice } from '../voice/voice';
+import { emitAck, setTournamentRoomHook, socket } from './client';
 import { storage } from './storage';
 
 export type TournamentError = 'NOT_FOUND' | 'RATE_LIMITED' | 'FAILED';
@@ -31,9 +33,11 @@ export interface TournamentState {
   status: TournamentStatus;
   view: TournamentView | null;
   you: LetterAssignment | null;
+  /** Who is in the tournament's voice call right now. */
+  call: TournamentVoiceMember[];
 }
 
-let state: TournamentState = { status: { kind: 'idle' }, view: null, you: null };
+let state: TournamentState = { status: { kind: 'idle' }, view: null, you: null, call: [] };
 const listeners = new Set<() => void>();
 
 function set(patch: Partial<TournamentState>): void {
@@ -77,6 +81,7 @@ export async function enterTournament(rawId: string, name?: string): Promise<voi
     storage.setTournamentToken(id, res.token);
     storage.rememberTournament({ id, label: labelOf(res.view.players), you: res.you.name });
     set({ status: { kind: 'in', id }, view: res.view, you: res.you });
+    joinCall(id, res.you, res.iceServers as RTCIceServer[]);
     return;
   }
   const retryAfterMs = 'retryAfterMs' in res ? (res.retryAfterMs ?? 0) : 0;
@@ -113,8 +118,61 @@ export async function enterTournament(rawId: string, name?: string): Promise<voi
 
 export function leaveTournament(): void {
   socket.emit('tournament:leave');
-  set({ status: { kind: 'idle' }, view: null, you: null });
+  voice.leaveIf('tournament');
+  set({ status: { kind: 'idle' }, view: null, you: null, call: [] });
 }
+
+export const callId = (letter: string) => `T:${letter}`;
+
+/** The tournament's voice call: on from the tournament page through its matches and back. */
+function joinCall(id: string, you: LetterAssignment, iceServers: RTCIceServer[]): void {
+  voice.enter({
+    context: 'tournament',
+    selfId: callId(you.letter),
+    iceServers,
+    sendSignal: (to, toSession, data) =>
+      socket.emit('tvoice:signal', { to: to.slice(2) as never, toSession, data }),
+    sendMic: (mic) => {
+      socket.emit('tvoice:mic', { mic });
+      // A match room shows the mic badges from its own state.
+      socket.emit('voice:mic', { mic });
+    },
+  });
+  syncCall(id);
+}
+
+function syncCall(id: string): void {
+  const s = state.status;
+  if (s.kind !== 'in' || s.id !== id || !state.you) return;
+  const players = state.view?.players ?? [];
+  voice.sync(
+    state.call.map((m) => ({
+      id: callId(m.letter),
+      name: players.find((p) => p.letter === m.letter)?.name,
+      connected: true,
+      voiceSession: m.session,
+    })),
+    callId(state.you.letter),
+  );
+}
+
+socket.on('tvoice:members', ({ id, members }) => {
+  const s = state.status;
+  if ((s.kind !== 'in' && s.kind !== 'loading') || s.id !== id) return;
+  set({ call: members });
+  syncCall(id);
+});
+
+socket.on('tvoice:signal', ({ from, fromSession, data }) => {
+  if (voice.context === 'tournament') voice.handleSignal(callId(from), fromSession, data);
+});
+
+// A match room opened straight from its link (a reload, a shared link) still joins the call.
+setTournamentRoomHook((tournamentId) => {
+  const s = state.status;
+  if ((s.kind === 'in' || s.kind === 'loading') && s.id === tournamentId) return;
+  void enterTournament(tournamentId);
+});
 
 /** "Jugar": opens (or returns) the room of the next pending match and remembers whose it is. */
 export async function playNext(): Promise<
@@ -148,7 +206,10 @@ export async function refreshKnownTournaments(): Promise<TournamentSummary[]> {
 
 socket.on('tournament:state', (view) => {
   const s = state.status;
-  if (s.kind === 'in' && s.id === view.id) set({ view });
+  if (s.kind === 'in' && s.id === view.id) {
+    set({ view });
+    syncCall(view.id);
+  }
 });
 
 socket.on('connect', () => {

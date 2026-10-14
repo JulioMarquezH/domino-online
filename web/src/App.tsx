@@ -36,7 +36,7 @@ export function App() {
           Reconectando…
         </div>
       )}
-      {inRoom && <AudioUnlock />}
+      {(inRoom || inTournament) && <AudioUnlock />}
       {showSwipeHint && <SwipeHint />}
     </>
   );

@@ -1,5 +1,5 @@
 /** Wire types for the tournament feature (Socket.IO). The client never sends results or schedules. */
-import type { Ack } from './protocol';
+import type { Ack, MicState, RTCIceServerConfig, SignalPayload } from './protocol';
 import type { Letter, LetterAssignment, Pair, Pairing, StandingRow } from './tournament';
 
 export type MatchStatus = 'pendiente' | 'jugando' | 'terminado';
@@ -48,10 +48,19 @@ export interface TournamentCreated {
 
 export interface TournamentEntered {
   id: string;
+  /** For the tournament's voice call. */
+  iceServers: RTCIceServerConfig[];
   /** Stored by the device (localStorage `tournament:<id>`) to skip the name prompt next time. */
   token: string;
   you: LetterAssignment;
   view: TournamentView;
+}
+
+/** Someone in the tournament's voice call. `session` changes on every reconnection. */
+export interface TournamentVoiceMember {
+  letter: Letter;
+  session: string;
+  mic: MicState;
 }
 
 export interface TournamentSummary {
@@ -119,10 +128,15 @@ export interface TournamentClientToServer {
   'tournament:play': (ack: (r: Ack<{ roomId: string }>) => void) => void;
   'tournament:export': (ack: (r: Ack<{ data: TournamentExport }>) => void) => void;
   'tournament:leave': () => void;
+  /** Voice call of the tournament (one per tournament, from its page through its matches). */
+  'tvoice:signal': (p: { to: Letter; toSession: string; data: SignalPayload }) => void;
+  'tvoice:mic': (p: { mic: MicState }) => void;
 }
 
 export interface TournamentServerToClient {
   'tournament:state': (view: TournamentView) => void;
+  'tvoice:members': (p: { id: string; members: TournamentVoiceMember[] }) => void;
+  'tvoice:signal': (p: { from: Letter; fromSession: string; data: SignalPayload }) => void;
 }
 
 /** What a tournament room tells its four players about itself. */

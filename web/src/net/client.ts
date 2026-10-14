@@ -71,11 +71,28 @@ export function emitAck<T extends object = object>(
   });
 }
 
+/** Set by the tournament module: makes sure the tournament's call is on (e.g. after a reload). */
+let tournamentRoomHook: ((tournamentId: string) => void) | null = null;
+export function setTournamentRoomHook(fn: (tournamentId: string) => void): void {
+  tournamentRoomHook = fn;
+}
+
 function onJoined(res: JoinOk, name: string): void {
   storage.setToken(res.roomId, res.token);
   storage.setName(name);
   set({ status: { kind: 'in', roomId: res.roomId } });
+  const tournamentId = storage.getRoomTournament(res.roomId);
+  if (tournamentId) {
+    // A tournament match uses the tournament's own call: it was already on in the tournament
+    // page and keeps going when the match ends, so nobody gets hung up between screens.
+    voice.leaveIf('room');
+    tournamentRoomHook?.(tournamentId);
+    const mic = voice.getSnapshot().mic;
+    if (voice.context === 'tournament' && mic !== 'pending') socket.emit('voice:mic', { mic });
+    return;
+  }
   voice.enter({
+    context: 'room',
     selfId: res.playerId,
     iceServers: res.iceServers as RTCIceServer[],
     sendSignal: (to, toSession, data) => socket.emit('rtc:signal', { to, toSession, data }),
@@ -125,7 +142,7 @@ async function doJoin(roomId: string, name?: string): Promise<void> {
     return;
   }
   const code = res.code;
-  voice.leave();
+  voice.leaveIf('room');
   if (code === 'NEED_NAME' || code === 'NAME_TAKEN' || code === 'NAME_INVALID') {
     set({
       view: null,
@@ -147,7 +164,7 @@ export function leaveRoom(): void {
   socket.emit('room:leave');
   const s = state.status;
   if (s.kind === 'in') storage.clearToken(s.roomId);
-  voice.leave();
+  voice.leaveIf('room');
   set({ status: { kind: 'idle' }, view: null });
 }
 
@@ -191,14 +208,23 @@ socket.on('state', (view) => {
   const s = state.status;
   if (s.kind !== 'in' || s.roomId !== view.roomId) return;
   set({ view, receivedAt: performance.now() });
-  voice.sync(view.players, view.youId);
+  if (view.tournament && voice.context === 'tournament') {
+    // Same people as the tournament call: show its speaking state on the table's avatars.
+    voice.setAliases(
+      new Map(view.players.filter((p) => p.letter).map((p) => [p.id, `T:${p.letter}`])),
+    );
+  } else {
+    voice.sync(view.players, view.youId);
+  }
 });
 
-socket.on('rtc:signal', (msg) => voice.handleSignal(msg.from, msg.fromSession, msg.data));
+socket.on('rtc:signal', (msg) => {
+  if (voice.context === 'room') voice.handleSignal(msg.from, msg.fromSession, msg.data);
+});
 
 socket.on('room:closed', ({ reason }) => {
   const s = state.status;
-  voice.leave();
+  voice.leaveIf('room');
   if (s.kind === 'in') {
     set({
       view: null,
