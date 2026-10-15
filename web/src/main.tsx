@@ -10,9 +10,11 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { installGestureUnlock } from './audio/context';
 import { getClientState } from './net/client';
+import { watchForNewVersion } from './net/freshness';
 import { voice } from './voice/voice';
 
 installGestureUnlock(() => voice.unlock());
+watchForNewVersion();
 
 // iOS Safari ignores user-scalable=no; block pinch-zoom and double-tap zoom in rooms.
 document.addEventListener('gesturestart', (e) => e.preventDefault());

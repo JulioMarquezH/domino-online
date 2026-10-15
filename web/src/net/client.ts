@@ -9,6 +9,7 @@ import {
 import { useSyncExternalStore } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import { voice } from '../voice/voice';
+import { reloadIfStale } from './freshness';
 import { navigate, tournamentPath } from './router';
 import { storage } from './storage';
 
@@ -195,7 +196,11 @@ export const actions = {
   rematch: (keepTeams: boolean) => emitAck('match:rematch', { keepTeams }),
 };
 
+let everConnected = false;
 socket.on('connect', () => {
+  // A reconnection may mean the server was redeployed: never keep running stale code.
+  if (everConnected) void reloadIfStale();
+  everConnected = true;
   set({ connected: true });
   const s = state.status;
   // After a drop (or a server restart) re-claim the seat with the stored token.
