@@ -255,8 +255,8 @@ export function isReaction(value: unknown): value is (typeof REACTIONS)[number] 
 /** One line of chat: no control characters, single spaces, 1–140 characters; null otherwise. */
 export function cleanChatText(raw: unknown): string | null {
   if (typeof raw !== 'string') return null;
-  // eslint-disable-next-line no-control-regex
   const text = raw
+    // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u001f\u007f]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
