@@ -256,6 +256,11 @@ export class Room {
     return this.players.find((p) => p.id === id);
   }
 
+  /** True if `token` belongs to someone already seated here (a returning player). */
+  hasToken(token: string | null): boolean {
+    return token !== null && this.players.some((p) => p.token === token);
+  }
+
   get connectedCount(): number {
     return this.players.filter((p) => p.socketId !== null).length;
   }

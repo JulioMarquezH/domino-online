@@ -133,11 +133,13 @@ export class TournamentService {
     req: { id: unknown; name?: unknown; token?: unknown },
     ctx: ClientCtx,
   ): Ack<Omit<TournamentEntered, 'iceServers'>> & { letter?: Letter; id?: string } {
+    // The attempt limit only ever stops wrong guesses: a registered player who types their
+    // name (or brings their device token) always gets in, even from a busy shared Wi-Fi.
     const limited = this.limited(ctx);
-    if (limited) return limited;
     const id = typeof req.id === 'string' ? normalizeTournamentId(req.id) : '';
     const stored = isValidTournamentId(id) ? this.store.load(id) : null;
     if (!stored) {
+      if (limited) return limited;
       this.recordFailure(ctx);
       return { ok: false, code: 'NOT_FOUND' };
     }
@@ -160,6 +162,7 @@ export class TournamentService {
     const letter = this.store.letterForName(id, normalizeNameKey(clean));
     const you = letter ? stored.players.find((p) => p.letter === letter) : undefined;
     if (!letter || !you) {
+      if (limited) return limited;
       this.recordFailure(ctx);
       return { ok: false, code: 'NAME_UNKNOWN' };
     }

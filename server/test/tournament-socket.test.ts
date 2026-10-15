@@ -265,9 +265,11 @@ describe('entering a tournament', () => {
         code: 'NAME_UNKNOWN',
       });
     }
-    const blocked = await call(a, 'tournament:enter', { id, name: 'Ana' });
+    const blocked = await call(a, 'tournament:enter', { id, name: 'Nadie9' });
     expect(blocked).toMatchObject({ ok: false, code: 'RATE_LIMITED' });
     expect((blocked as { retryAfterMs: number }).retryAfterMs).toBeGreaterThan(0);
+    // The limit only stops wrong guesses: a registered player typing their name gets in.
+    expect(await call(a, 'tournament:enter', { id, name: 'ana' })).toMatchObject({ ok: true });
 
     // A fresh socket from the same IP has its own budget… until the IP budget (5) is spent.
     for (let i = 0; i < 2; i++) {
@@ -275,9 +277,14 @@ describe('entering a tournament', () => {
         code: 'NOT_FOUND',
       });
     }
-    expect(await call(b, 'tournament:enter', { id, name: 'Ana' })).toMatchObject({
+    expect(await call(b, 'tournament:enter', { id: 'ZZZZZZZZZZZZ', name: 'x' })).toMatchObject({
       code: 'RATE_LIMITED',
     });
+    expect(await call(b, 'tournament:enter', { id, name: 'Nadie' })).toMatchObject({
+      code: 'RATE_LIMITED',
+    });
+    // Same shared Wi-Fi, another real player: still in.
+    expect(await call(b, 'tournament:enter', { id, name: 'Beto' })).toMatchObject({ ok: true });
   });
 
   it('validates remembered IDs and silently drops the dead ones', async () => {

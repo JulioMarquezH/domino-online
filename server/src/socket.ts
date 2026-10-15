@@ -165,12 +165,13 @@ export function attachSocketHandlers(
       const spec = room.tournament;
       if (spec) {
         // Tournament rooms: the device's tournament token (or its room token) is the only way in.
+        // A real player is never held back by the attempt limit; only strangers are.
+        const letter = tournaments.identify(spec.tournamentId, p.tt);
         const blocked = tournaments.blockedFor(ctx);
-        if (blocked > 0) {
+        if (blocked > 0 && !letter && !room.hasToken(token)) {
           reply({ ok: false, code: 'RATE_LIMITED', retryAfterMs: blocked });
           return;
         }
-        const letter = tournaments.identify(spec.tournamentId, p.tt);
         enter(room, { name: null, token, identity: letter ? { letter } : null }, reply);
         return;
       }

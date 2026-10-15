@@ -61,9 +61,9 @@ const RESTART_AFTER_MS = 4000;
 const HARD_RESET_AFTER_MS = 15000;
 
 /**
- * iPhone/iPad Safari ignores HTMLMediaElement.volume (it even reads back the value you set),
- * so there every voice goes through a Web Audio gain. Elsewhere the element's volume works and
- * keeps the browser's echo cancellation on its native path.
+ * iPhone/iPad Safari ignores HTMLMediaElement.volume (it even reads back the value you set), so
+ * there a voice you turned down goes through a Web Audio gain. Everything else plays on the
+ * element, which keeps the browser's echo cancellation on its native path.
  */
 const useWebAudioOutput = isIOS();
 
@@ -615,8 +615,15 @@ class VoiceManager {
     const pref = this.prefOf(peer.id);
     const level = pref.muted ? 0 : pref.volume;
     const ctx = getAudioContext();
+    // Normal playback stays on the <audio> element (proven on every phone). Only a voice you
+    // turned down on iOS, where the element ignores volume, goes through a Web Audio gain.
     const viaGain =
-      useWebAudioOutput && ctx !== null && ctx.state === 'running' && peer.stream !== null;
+      useWebAudioOutput &&
+      pref.volume < 1 &&
+      !pref.muted &&
+      ctx !== null &&
+      ctx.state === 'running' &&
+      peer.stream !== null;
     if (viaGain && ctx && peer.stream) {
       if (!peer.meter) peer.meter = new Meter(ctx, peer.stream);
       if (!peer.gain) {
@@ -631,6 +638,7 @@ class VoiceManager {
       peer.gain = null;
       peer.audio.muted = pref.muted;
       peer.audio.volume = pref.volume;
+      if (peer.audio.paused && peer.stream) peer.audio.play().catch(() => undefined);
     }
   }
 
