@@ -1813,3 +1813,257 @@
     display: none;
   }
 }
+
+/* ───────────── fun: chat, reactions, things thrown ───────────── */
+.fun-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.fun-projectile,
+.fun-impact,
+.fun-stain,
+.fun-react {
+  position: absolute;
+  line-height: 1;
+  transform: translate(-50%, -50%);
+  will-change: transform, opacity;
+  filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.45));
+}
+
+.fun-projectile {
+  font-size: clamp(30px, 9dvh, 46px);
+}
+
+.fun-impact {
+  font-size: clamp(44px, 15dvh, 80px);
+}
+
+.impact-bomb {
+  font-size: clamp(64px, 24dvh, 120px);
+}
+
+.fun-stain {
+  font-size: clamp(30px, 10dvh, 48px);
+}
+
+.fun-react {
+  font-size: clamp(26px, 9dvh, 40px);
+}
+
+.fun-bubble {
+  position: absolute;
+  max-width: min(320px, 70vw);
+  padding: 7px 12px;
+  border-radius: 16px 16px 16px 4px;
+  font-size: 0.9rem;
+  line-height: 1.3;
+  color: #1b1307;
+  background: #fff8e6;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+  overflow-wrap: anywhere;
+  will-change: transform, opacity;
+}
+
+.fun-bubble strong {
+  color: #7a4a10;
+  margin-right: 4px;
+}
+
+.chat-btn {
+  position: relative;
+}
+
+.chat-btn.is-on {
+  border-color: var(--brass-hi);
+  color: var(--brass-hi);
+}
+
+.chat-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #fff;
+  background: var(--danger);
+  box-shadow: 0 0 0 2px var(--bg-0);
+}
+
+.chat-panel {
+  position: fixed;
+  z-index: 50;
+  top: var(--safe-t);
+  right: var(--safe-r);
+  bottom: var(--safe-b);
+  width: min(340px, 46vw);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 18px;
+  background: rgba(9, 22, 18, 0.97);
+  border: 1px solid var(--line);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+  touch-action: pan-y;
+  animation: chat-in 0.22s ease-out both;
+}
+
+@keyframes chat-in {
+  from {
+    opacity: 0;
+    translate: 24px 0;
+  }
+}
+
+.chat-panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chat-panel header .btn {
+  min-height: 32px;
+}
+
+.chat-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 2px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  font-size: 0.88rem;
+  line-height: 1.3;
+}
+
+.chat-list li {
+  padding: 5px 9px;
+  border-radius: 12px;
+  background: rgba(255, 244, 214, 0.05);
+  overflow-wrap: anywhere;
+}
+
+.chat-list li.mine {
+  background: rgba(217, 176, 100, 0.14);
+}
+
+.chat-list strong {
+  color: var(--brass-hi);
+}
+
+.chat-empty {
+  color: var(--ink-3);
+  font-style: italic;
+}
+
+.chat-reactions,
+.picker-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chat-reactions button,
+.picker-row button {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid rgba(245, 237, 219, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 244, 214, 0.05);
+  font-size: 1.25rem;
+  line-height: 1;
+  transition: transform 0.12s;
+  touch-action: manipulation;
+}
+
+.chat-reactions button:active,
+.picker-row button:active {
+  transform: scale(0.88);
+}
+
+.chat-form {
+  display: flex;
+  gap: 6px;
+}
+
+.chat-form input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(217, 176, 100, 0.3);
+  background: rgba(3, 12, 9, 0.6);
+  font-size: 16px; /* 16px: iOS doesn't zoom into the field */
+  outline: none;
+}
+
+.chat-form input:focus {
+  border-color: var(--brass);
+}
+
+.throw-picker {
+  display: grid;
+  gap: 4px;
+}
+
+.picker-title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.throw-picker .picker-row {
+  flex-wrap: nowrap;
+}
+
+.self-seat {
+  position: relative;
+}
+
+.self-pop {
+  top: auto;
+  bottom: calc(100% + 6px);
+  left: 0;
+  translate: 0 0;
+}
+
+.self-pop .picker-row {
+  flex-wrap: wrap;
+  width: 210px;
+}
+
+/* Only the tiles take taps (to say who played them); the rest of the layer lets them through. */
+.snake-layer {
+  pointer-events: none;
+}
+
+.snake-layer .board-tile {
+  pointer-events: auto;
+}
+
+/* A seat with its menu open sits above the table (a dimmed seat would trap it underneath). */
+.has-turn .seat-slot.pop-open,
+.seat-slot.pop-open {
+  opacity: 1;
+  z-index: 30;
+}
+
+.cell:has(.seat-slot.pop-open) {
+  z-index: 30;
+}

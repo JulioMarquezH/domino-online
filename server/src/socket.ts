@@ -19,6 +19,7 @@ import {
   type DominoServer,
   type DominoSocket,
 } from './tournament-socket';
+import { Fun, type FunResult } from './fun';
 import { TournamentVoice } from './tournament-voice';
 import type { TournamentService } from './tournaments';
 
@@ -54,6 +55,7 @@ export function attachSocketHandlers(
   options: { trustProxy: boolean } = { trustProxy: false },
 ): void {
   const tournamentVoice = new TournamentVoice();
+  const fun = new Fun();
   io.on('connection', (socket: DominoSocket) => {
     socket.data.roomId = null;
     socket.data.playerId = null;
@@ -135,6 +137,7 @@ export function attachSocketHandlers(
         token: player.token,
         iceServers: iceServersFor(player.id),
       });
+      socket.emit('room:funlog', { events: fun.log(room) });
     };
 
     socket.on('room:create', (p, ack) => {
@@ -263,6 +266,36 @@ export function attachSocketHandlers(
         isRecord(p) && typeof p.keepTeams === 'boolean'
           ? room.rematch(id, p.keepTeams)
           : { ok: false, code: 'INVALID' },
+      ),
+    );
+
+    // Chat, reactions and things thrown at people: relayed to everyone in the room.
+    const funAction = (ack: unknown, run: (room: Room, playerId: string) => FunResult) => {
+      const reply = safeAck(ack);
+      const s = current();
+      if (!s) {
+        reply({ ok: false, code: 'NOT_IN_ROOM' });
+        return;
+      }
+      const res = run(s.room, s.playerId);
+      if (!res.ok) {
+        reply({ ok: false, code: res.code });
+        return;
+      }
+      for (const p of s.room.players) {
+        if (p.socketId && p.socketId !== BOT_SOCKET) io.to(p.socketId).emit('room:fun', res.event);
+      }
+      reply({ ok: true });
+    };
+    socket.on('room:chat', (p, ack) =>
+      funAction(ack, (room, id) => fun.chat(room, id, isRecord(p) ? p.text : null)),
+    );
+    socket.on('room:react', (p, ack) =>
+      funAction(ack, (room, id) => fun.react(room, id, isRecord(p) ? p.emoji : null)),
+    );
+    socket.on('room:throw', (p, ack) =>
+      funAction(ack, (room, id) =>
+        fun.throw(room, id, isRecord(p) ? p.to : null, isRecord(p) ? p.item : null),
       ),
     );
 

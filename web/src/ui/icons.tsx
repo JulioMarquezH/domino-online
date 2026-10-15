@@ -130,3 +130,10 @@ export const TableIcon = (p: P) => (
     <path d="M4 10h16M10 10v9" />
   </Svg>
 );
+
+export const ChatIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="M4 5h16v11H9l-5 4z" />
+    <path d="M8 9.5h8M8 12.5h5" />
+  </Svg>
+);

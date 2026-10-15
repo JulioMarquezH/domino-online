@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Avatar } from '../ui/Avatar';
 import { TileBack } from '../ui/Tile';
 import { PeerVoiceControl } from '../ui/VoiceControls';
+import { ThrowPicker } from './fun/Pickers';
 
 interface Props {
   player: PublicPlayer;
@@ -39,7 +40,7 @@ export function Seat({ player, position, isTurn, isPartner, dealKey, passedAt }:
   return (
     <div
       ref={ref}
-      className={`seat-slot pos-${position} ${isTurn ? 'is-turn' : ''} ${player.connected ? '' : 'offline'}`}
+      className={`seat-slot pos-${position} ${isTurn ? 'is-turn' : ''} ${player.connected ? '' : 'offline'} ${open ? 'pop-open' : ''}`}
       data-seat-name={player.name}
     >
       <div className="seat-id">
@@ -48,7 +49,7 @@ export function Seat({ player, position, isTurn, isPartner, dealKey, passedAt }:
           team={team}
           isSelf={false}
           active={isTurn}
-          onClick={player.isBot ? undefined : () => setOpen((o) => !o)}
+          onClick={() => setOpen((o) => !o)}
         />
         <div className="seat-text">
           <span className="seat-name">{player.name}</span>
@@ -76,9 +77,10 @@ export function Seat({ player, position, isTurn, isPartner, dealKey, passedAt }:
         ))}
       </div>
       {open && (
-        <div className="voice-pop" role="dialog" aria-label={`Audio de ${player.name}`}>
+        <div className="voice-pop" role="dialog" aria-label={player.name}>
           <span className="voice-pop-title">{player.name}</span>
-          <PeerVoiceControl player={player} />
+          {!player.isBot && <PeerVoiceControl player={player} />}
+          <ThrowPicker target={player} onDone={() => setOpen(false)} />
         </div>
       )}
     </div>

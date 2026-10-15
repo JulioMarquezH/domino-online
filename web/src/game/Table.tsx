@@ -24,6 +24,10 @@ import { HandSummary } from './HandSummary';
 import { MatchEnd } from './MatchEnd';
 import { Scoreboard } from './Scoreboard';
 import { Seat } from './Seat';
+import { ChatButton } from './fun/ChatButton';
+import { ChatPanel } from './fun/ChatPanel';
+import { FunLayer } from './fun/FunLayer';
+import { ReactionPicker } from './fun/Pickers';
 
 export function Table({ view }: { view: RoomView }) {
   const d = derive(view);
@@ -44,6 +48,7 @@ export function Table({ view }: { view: RoomView }) {
   const canPassNow = myTurn && canPass(hand, line);
   const selectedTile = selected && hand.includes(selected) ? selected : null;
 
+  const [reacting, setReacting] = useState(false);
   // The end-of-hand / end-of-match summary can be put away to look at the table, and reopened.
   const [hiddenSummary, setHiddenSummary] = useState<string | null>(null);
   const summaryKey = `${view.phase}:${g?.handNumber ?? 0}`;
@@ -247,7 +252,20 @@ export function Table({ view }: { view: RoomView }) {
         </div>
         <div className="cell c-bottom-left">
           <div className={`self-seat ${myTurn ? 'is-turn' : ''}`}>
-            {d.me && <Avatar player={d.me} team={d.myTeam} isSelf active={myTurn} />}
+            {d.me && (
+              <Avatar
+                player={d.me}
+                team={d.myTeam}
+                isSelf
+                active={myTurn}
+                onClick={() => setReacting((r) => !r)}
+              />
+            )}
+            {reacting && (
+              <div className="voice-pop self-pop" role="dialog" aria-label="Reaccionar">
+                <ReactionPicker onDone={() => setReacting(false)} />
+              </div>
+            )}
             <span className="self-label">{myTurn ? '¡Te toca!' : 'Tú'}</span>
           </div>
         </div>
@@ -278,13 +296,15 @@ export function Table({ view }: { view: RoomView }) {
           </button>
         </div>
       </div>
+      <FunLayer players={view.players} youId={view.youId} />
+      <ChatPanel players={view.players} youId={view.youId} />
       {summaryOpen && view.phase === 'handEnd' && (
         <HandSummary view={view} onHide={() => setHiddenSummary(summaryKey)} />
       )}
       {summaryOpen && view.phase === 'matchEnd' && (
         <MatchEnd view={view} onHide={() => setHiddenSummary(summaryKey)} />
       )}
-      {!summaryOpen && (
+      {atSummary && !summaryOpen && (
         <div className="summary-peek" role="region" aria-label="Resumen oculto">
           <span className="peek-text">Toca una ficha para ver quién la jugó</span>
           <button
@@ -306,6 +326,7 @@ function TableControls() {
   return (
     <div className="table-controls">
       <FullscreenButton />
+      <ChatButton />
       <SelfMicButton compact />
       <button
         type="button"

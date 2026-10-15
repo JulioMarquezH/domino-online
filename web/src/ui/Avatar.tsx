@@ -71,11 +71,18 @@ export function Avatar({ player, team, isSelf, size = 'md', active = false, onCl
       onClick={onClick}
       aria-label={label}
       data-speaking={speaking}
+      data-player-id={player.id}
     >
       {content}
     </button>
   ) : (
-    <span className={cls} role="img" aria-label={label} data-speaking={speaking}>
+    <span
+      className={cls}
+      role="img"
+      aria-label={label}
+      data-speaking={speaking}
+      data-player-id={player.id}
+    >
       {content}
     </span>
   );

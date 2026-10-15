@@ -215,12 +215,52 @@ export interface ClientToServerEvents extends TournamentClientToServer {
   'pause:decide': (p: { playerId: string; decision: PauseDecision }, ack: (r: Ack) => void) => void;
   'match:rematch': (p: { keepTeams: boolean }, ack: (r: Ack) => void) => void;
   'voice:mic': (p: { mic: MicState }) => void;
+  'room:chat': (p: { text: string }, ack: (r: Ack) => void) => void;
+  'room:react': (p: { emoji: string }, ack: (r: Ack) => void) => void;
+  'room:throw': (p: { to: string; item: Throwable }, ack: (r: Ack) => void) => void;
   'rtc:signal': (p: { to: string; toSession: string; data: SignalPayload }) => void;
 }
 
 export interface ServerToClientEvents extends TournamentServerToClient {
   state: (view: RoomView) => void;
+  /** Chat, reactions and things thrown at people, as they happen. */
+  'room:fun': (e: FunEvent) => void;
+  /** Recent chat, sent once when you (re)join a room. */
+  'room:funlog': (p: { events: FunEvent[] }) => void;
   'rtc:signal': (p: { from: string; fromSession: string; data: SignalPayload }) => void;
   /** The room is gone (deleted, match aborted for you, or you opened it elsewhere). */
   'room:closed': (p: { reason: 'deleted' | 'replaced' | 'kicked' }) => void;
+}
+
+// ───────────────────────────── fun: chat, reactions, things to throw ─────────────────────────────
+
+export const CHAT_MAX_LENGTH = 140;
+export const REACTIONS = ['😂', '🔥', '👏', '😱', '😡', '🤡', '💩', '🙏', '😎', '🥱'] as const;
+export const THROWABLES = ['tomato', 'egg', 'bomb', 'chancla', 'rose', 'kiss'] as const;
+export type Throwable = (typeof THROWABLES)[number];
+
+export type FunEvent =
+  | { id: number; kind: 'chat'; from: string; text: string; at: number }
+  | { id: number; kind: 'react'; from: string; emoji: string; at: number }
+  | { id: number; kind: 'throw'; from: string; to: string; item: Throwable; at: number };
+
+export function isThrowable(value: unknown): value is Throwable {
+  return typeof value === 'string' && (THROWABLES as readonly string[]).includes(value);
+}
+
+export function isReaction(value: unknown): value is (typeof REACTIONS)[number] {
+  return typeof value === 'string' && (REACTIONS as readonly string[]).includes(value);
+}
+
+/** One line of chat: no control characters, single spaces, 1–140 characters; null otherwise. */
+export function cleanChatText(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  // eslint-disable-next-line no-control-regex
+  const text = raw
+    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const chars = [...text];
+  if (chars.length === 0) return null;
+  return chars.length > CHAT_MAX_LENGTH ? chars.slice(0, CHAT_MAX_LENGTH).join('') : text;
 }
