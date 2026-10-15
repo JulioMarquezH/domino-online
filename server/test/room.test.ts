@@ -166,13 +166,18 @@ describe('game flow', () => {
     }
   });
 
-  it('auto-continues after the summary countdown', () => {
+  it('waits for everybody to press "Continuar" — no timer', () => {
     room.start(host());
     runDraw();
     playOutHand();
     if (room.phase !== 'handEnd') return;
-    expect(view(0).nextHandInMs).toBe(TIMINGS.nextHandMs);
-    clock.advance(TIMINGS.nextHandMs);
+    expect(view(0).nextHandInMs).toBeNull();
+    clock.advance(10 * 60_000);
+    expect(room.phase).toBe('handEnd');
+    ids.slice(0, 3).forEach((id) => room.markReady(id));
+    expect(room.phase).toBe('handEnd');
+    expect(view(0).ready).toHaveLength(3);
+    room.markReady(ids[3] as string);
     expect(room.phase).toBe('playing');
     expect(view(0).game?.handNumber).toBe(2);
   });
@@ -184,7 +189,7 @@ describe('game flow', () => {
     while (room.phase !== 'matchEnd') {
       playOutHand(mulberry32(100 + hands));
       hands++;
-      if (room.phase === 'handEnd') clock.advance(TIMINGS.nextHandMs);
+      if (room.phase === 'handEnd') ids.forEach((id) => room.markReady(id));
       if (hands > 100) throw new Error('too many hands');
     }
     const v = view(0);

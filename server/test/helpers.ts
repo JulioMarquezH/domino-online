@@ -46,6 +46,8 @@ export async function playRoomToEnd(
   const { legalMoves } = await import('@domino/shared');
   for (let guard = 0; guard < 4000 && room.phase !== 'matchEnd'; guard++) {
     if (room.phase === 'handEnd') {
+      // The next hand only starts when everybody pressed "Continuar".
+      for (const p of playerIds) room.markReady(p);
       clock.advance(nextHandMs);
       continue;
     }

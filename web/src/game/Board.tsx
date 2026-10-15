@@ -1,5 +1,5 @@
 import { type End, type PlacedTile, type ScreenPosition, type Seat } from '@domino/shared';
-import { useMemo, type CSSProperties } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useElementSize } from '../ui/hooks';
 import { TileFace } from '../ui/Tile';
 import { chooseLimit, layoutSnake } from './layout';
@@ -10,9 +10,11 @@ interface Props {
   showTargets: boolean;
   hoverEnd: End | null;
   onTarget: (end: End) => void;
-  /** A tap on the felt (not on a target), in client coordinates. */
-  onBoardTap: (x: number, y: number) => void;
+  /** A tap on the felt (not on a target), in client coordinates. True if it played a tile. */
+  onBoardTap: (x: number, y: number) => boolean;
   positionOf: (seat: Seat) => ScreenPosition;
+  /** "Tú" or the player's name. */
+  nameOf: (seat: Seat) => string;
 }
 
 const ENTER_FROM: Record<ScreenPosition, [number, number]> = {
@@ -31,7 +33,15 @@ export function Board({
   onTarget,
   onBoardTap,
   positionOf,
+  nameOf,
 }: Props) {
+  // Tapping a played tile says who played it and when.
+  const [info, setInfo] = useState<string | null>(null);
+  useEffect(() => {
+    if (!info) return;
+    const t = setTimeout(() => setInfo(null), 3500);
+    return () => clearTimeout(t);
+  }, [info]);
   const [ref, size] = useElementSize<HTMLDivElement>();
   // Row width depends only on the board's shape, so tiles never jump during a hand.
   const qw = Math.round(size.w / 16);
@@ -47,6 +57,9 @@ export function Board({
   const ox = size.w / 2 - ((b.minX + b.maxX) / 2) * unit;
   const oy = size.h / 2 - ((b.minY + b.maxY) / 2) * unit;
   const seatByTile = new Map(line.map((t) => [t.tile, t.seat]));
+  const placed = new Map(line.map((t) => [t.tile, t]));
+  const infoBox = info ? layout.tiles.find((t) => t.key === info) : undefined;
+  const infoTile = info ? placed.get(info) : undefined;
 
   const boxStyle = (cx: number, cy: number, angle: number): CSSProperties => ({
     width: unit,
@@ -60,8 +73,11 @@ export function Board({
       ref={ref}
       data-unit={unit.toFixed(1)}
       onClick={(e) => {
-        if (!(e.target as HTMLElement).closest('[data-end-target]'))
-          onBoardTap(e.clientX, e.clientY);
+        const el = e.target as HTMLElement;
+        if (el.closest('[data-end-target]')) return;
+        if (onBoardTap(e.clientX, e.clientY)) return;
+        const tile = el.closest<HTMLElement>('.board-tile')?.dataset.tile ?? null;
+        setInfo(tile && tile !== info ? tile : null);
       }}
     >
       <div className="snake-layer">
@@ -73,7 +89,7 @@ export function Board({
             return (
               <div
                 key={t.key}
-                className="board-tile entering"
+                className={`board-tile entering ${info === t.key ? 'is-picked' : ''}`}
                 style={
                   {
                     ...boxStyle(t.cx, t.cy, t.angle),
@@ -117,6 +133,19 @@ export function Board({
             />
           );
         })}
+      {infoBox && infoTile && (
+        <div
+          className="tile-info"
+          role="status"
+          style={{
+            left: ox + infoBox.cx * unit,
+            top: oy + (infoBox.cy - infoBox.h / 2) * unit - 6,
+          }}
+        >
+          <strong>{infoTile.tile.replace('-', '|')}</strong> · {nameOf(infoTile.seat)}
+          {infoTile.n !== undefined && <span> · jugada {infoTile.n}</span>}
+        </div>
+      )}
     </div>
   );
 }

@@ -44,6 +44,11 @@ export function Table({ view }: { view: RoomView }) {
   const canPassNow = myTurn && canPass(hand, line);
   const selectedTile = selected && hand.includes(selected) ? selected : null;
 
+  // The end-of-hand / end-of-match summary can be put away to look at the table, and reopened.
+  const [hiddenSummary, setHiddenSummary] = useState<string | null>(null);
+  const summaryKey = `${view.phase}:${g?.handNumber ?? 0}`;
+  const atSummary = view.phase === 'handEnd' || view.phase === 'matchEnd';
+  const summaryOpen = atSummary && hiddenSummary !== summaryKey;
   const ev = g?.lastEvent && g.lastEvent.id !== initialEventId ? g.lastEvent : null;
   const announcement = ((): Announcement | null => {
     if (!ev) return null;
@@ -204,8 +209,11 @@ export function Table({ view }: { view: RoomView }) {
                 if (selectedTile) void attempt(selectedTile, end);
               }}
               onBoardTap={(x, y) => {
-                if (selectedTile && myTurn) playOnBoard(selectedTile, x, y);
+                if (!selectedTile || !myTurn) return false;
+                playOnBoard(selectedTile, x, y);
+                return true;
               }}
+              nameOf={(seat) => (seat === mySeat ? 'Tú' : d.nameAt(seat))}
               positionOf={d.position}
             />
             <Announcer message={announcement} />
@@ -270,8 +278,24 @@ export function Table({ view }: { view: RoomView }) {
           </button>
         </div>
       </div>
-      {view.phase === 'handEnd' && <HandSummary view={view} />}
-      {view.phase === 'matchEnd' && <MatchEnd view={view} />}
+      {summaryOpen && view.phase === 'handEnd' && (
+        <HandSummary view={view} onHide={() => setHiddenSummary(summaryKey)} />
+      )}
+      {summaryOpen && view.phase === 'matchEnd' && (
+        <MatchEnd view={view} onHide={() => setHiddenSummary(summaryKey)} />
+      )}
+      {!summaryOpen && (
+        <div className="summary-peek" role="region" aria-label="Resumen oculto">
+          <span className="peek-text">Toca una ficha para ver quién la jugó</span>
+          <button
+            type="button"
+            className="btn primary small"
+            onClick={() => setHiddenSummary(null)}
+          >
+            Ver resumen
+          </button>
+        </div>
+      )}
     </div>
   );
 }

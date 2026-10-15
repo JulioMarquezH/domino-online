@@ -1,28 +1,32 @@
 import type { RoomView } from '@domino/shared';
 import { useState } from 'react';
 import { actions } from '../net/client';
-import { useCountdown } from '../ui/hooks';
 import { derive } from './derive';
 import { HandBreakdown } from './HandBreakdown';
 import { verdictOf } from './verdict';
 
-export function HandSummary({ view }: { view: RoomView }) {
+export function HandSummary({ view, onHide }: { view: RoomView; onHide: () => void }) {
   const d = derive(view);
   const r = view.handResult;
   const g = view.game;
   const [sent, setSent] = useState(false);
-  const left = useCountdown(view.nextHandInMs);
   if (!r || !g) return null;
   const v = verdictOf(r, d);
   const imReady = sent || view.ready.includes(view.youId);
   const us = d.myTeam ?? 0;
   const them = us === 0 ? 1 : 0;
+  const waiting = view.players.filter((p) => !p.isBot && !view.ready.includes(p.id));
   return (
     <div className="overlay summary-overlay">
       <div className="card overlay-card summary-card" role="dialog" aria-label="Fin de la mano">
-        <p className="eyebrow">
-          Mano {g.handNumber} · {v.kicker}
-        </p>
+        <div className="summary-top">
+          <p className="eyebrow">
+            Mano {g.handNumber} · {v.kicker}
+          </p>
+          <button type="button" className="btn ghost small hide-summary" onClick={onHide}>
+            Ver mesa
+          </button>
+        </div>
         <div className="verdict">
           <h2
             className={`title verdict-title ${v.winner === null ? 'tie' : `team-text-${v.winner}`}`}
@@ -59,8 +63,9 @@ export function HandSummary({ view }: { view: RoomView }) {
               {imReady ? 'Listo ✓' : 'Continuar'}
             </button>
             <span className="muted small">
-              {view.ready.length}/4 listos
-              {left !== null && ` · siguiente mano en ${Math.ceil(left / 1000)} s`}
+              {waiting.length === 0
+                ? 'Empezando…'
+                : `Esperando a ${waiting.map((p) => (p.id === view.youId ? 'ti' : p.name)).join(', ')}`}
             </span>
           </div>
         </div>

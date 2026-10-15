@@ -6,7 +6,7 @@ import { derive } from './derive';
 import { HandBreakdown } from './HandBreakdown';
 import { verdictOf } from './verdict';
 
-export function MatchEnd({ view }: { view: RoomView }) {
+export function MatchEnd({ view, onHide }: { view: RoomView; onHide: () => void }) {
   const d = derive(view);
   const g = view.game;
   const winner = view.matchWinner;
@@ -24,10 +24,15 @@ export function MatchEnd({ view }: { view: RoomView }) {
   return (
     <div className="overlay match-overlay">
       <div className="card overlay-card match-card" role="dialog" aria-label="Fin de la partida">
-        <p className="eyebrow">
-          Fin de la partida · a {g.target}
-          {view.tournament && ` · Partido ${view.tournament.number} del torneo`}
-        </p>
+        <div className="summary-top">
+          <p className="eyebrow">
+            Fin de la partida · a {g.target}
+            {view.tournament && ` · Partido ${view.tournament.number} del torneo`}
+          </p>
+          <button type="button" className="btn ghost small hide-summary" onClick={onHide}>
+            Ver mesa
+          </button>
+        </div>
         <h2 className="title big-title">
           {weWon ? '¡Ganamos!' : `Ganaron ${d.teamNames(winner)}`}
         </h2>

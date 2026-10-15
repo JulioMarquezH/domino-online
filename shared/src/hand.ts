@@ -12,6 +12,8 @@ export interface PlacedTile {
   left: number;
   right: number;
   seat: Seat;
+  /** 1 for the lead, 2 for the next tile played, … (passes don't count). */
+  n?: number;
 }
 
 export type TeamPips = [number, number];
@@ -144,14 +146,15 @@ export function isBlocked(hands: readonly TileId[][], line: readonly PlacedTile[
 
 function placeTile(line: PlacedTile[], tile: TileId, end: End, seat: Seat): PlacedTile {
   const ends = openEnds(line);
+  const n = line.length + 1;
   if (!ends) {
     const [hi, lo] = parseTile(tile);
-    return { tile, left: hi, right: lo, seat };
+    return { tile, left: hi, right: lo, seat, n };
   }
   if (end === 'left') {
-    return { tile, left: otherSide(tile, ends[0]), right: ends[0], seat };
+    return { tile, left: otherSide(tile, ends[0]), right: ends[0], seat, n };
   }
-  return { tile, left: ends[1], right: otherSide(tile, ends[1]), seat };
+  return { tile, left: ends[1], right: otherSide(tile, ends[1]), seat, n };
 }
 
 function dominoResult(hands: TileId[][], winner: Seat): HandResult {

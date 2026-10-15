@@ -1741,3 +1741,75 @@
   animation-iteration-count: 4;
   will-change: opacity;
 }
+
+/* ───────────── tap a played tile: who played it ───────────── */
+.board-tile.is-picked {
+  outline: 2px solid var(--brass-hi);
+  outline-offset: 2px;
+  border-radius: 14% / 7%;
+}
+
+.tile-info {
+  position: absolute;
+  z-index: 7;
+  translate: -50% -100%;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  white-space: nowrap;
+  color: var(--ink);
+  background: rgba(3, 12, 9, 0.92);
+  border: 1px solid rgba(243, 217, 151, 0.6);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  animation: badge-in 0.2s ease both;
+}
+
+.tile-info strong {
+  color: var(--brass-hi);
+}
+
+/* ───────────── summary put away ───────────── */
+.summary-top {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  min-height: 32px;
+}
+
+.hide-summary {
+  position: absolute;
+  right: -6px;
+  top: 50%;
+  translate: 0 -50%;
+  min-height: 34px !important;
+}
+
+.summary-peek {
+  position: fixed;
+  z-index: 45;
+  left: 50%;
+  top: calc(var(--safe-t) + 6px);
+  translate: -50% 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 6px 5px 14px;
+  border-radius: 999px;
+  background: rgba(3, 12, 9, 0.92);
+  border: 1px solid var(--line);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+}
+
+.peek-text {
+  font-size: 0.82rem;
+  color: var(--ink-2);
+}
+
+@media (max-height: 430px) {
+  .peek-text {
+    display: none;
+  }
+}

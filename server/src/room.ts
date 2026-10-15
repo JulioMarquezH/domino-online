@@ -647,9 +647,19 @@ export class Room {
     return OK;
   }
 
+  /**
+   * The next hand never starts on a timer: everyone gets to look at the result (and the table)
+   * as long as they want, and it starts once all four pressed "Continuar".
+   */
   private scheduleNextHand(): void {
-    this.nextHandAt = this.deps.clock.now() + this.deps.timings.nextHandMs;
-    this.setTimer('nextHand', this.deps.timings.nextHandMs, () => this.advanceHand());
+    this.nextHandAt = null;
+    this.advanceIfAllReady();
+  }
+
+  private advanceIfAllReady(): void {
+    if (this.players.every((p) => p.isBot || (p.socketId !== null && this.ready.has(p.id)))) {
+      this.advanceHand();
+    }
   }
 
   private advanceHand(): void {
@@ -749,8 +759,8 @@ export class Room {
   private onResume(): void {
     if (this.phase === 'draw' && this.draw?.outcome && !this.timers.has('draw')) {
       this.beginMatch();
-    } else if (this.phase === 'handEnd' && !this.timers.has('nextHand')) {
-      this.scheduleNextHand();
+    } else if (this.phase === 'handEnd') {
+      this.advanceIfAllReady();
     }
   }
 

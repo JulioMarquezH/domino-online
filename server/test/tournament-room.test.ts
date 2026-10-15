@@ -82,7 +82,7 @@ function startDraw() {
 function playToEnd(rng = mulberry32(9)) {
   for (let guard = 0; guard < 4000 && room.phase !== 'matchEnd'; guard++) {
     if (room.phase === 'handEnd') {
-      clock.advance(TIMINGS.nextHandMs);
+      for (const l of ['A', 'B', 'C', 'D'] as Letter[]) room.markReady(id(l));
       continue;
     }
     const turn = view('A').game?.turn as Seat;
