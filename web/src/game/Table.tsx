@@ -27,8 +27,8 @@ import { Seat } from './Seat';
 import { ChatButton } from './fun/ChatButton';
 import { ChatPanel } from './fun/ChatPanel';
 import { FunLayer } from './fun/FunLayer';
-import { ArmedHint, ArsenalButton } from './fun/Arsenal';
-import { throwAt, useFun } from '../net/fun';
+import { ArsenalButton, ThrowTray } from './fun/Arsenal';
+import { useFun } from '../net/fun';
 
 export function Table({ view }: { view: RoomView }) {
   const d = derive(view);
@@ -215,11 +215,6 @@ export function Table({ view }: { view: RoomView }) {
                 if (selectedTile) void attempt(selectedTile, end);
               }}
               onBoardTap={(x, y) => {
-                if (armed) {
-                  const b = document.querySelector('.board')?.getBoundingClientRect();
-                  if (b) void throwAt(armed, (x - b.left) / b.width, (y - b.top) / b.height);
-                  return true;
-                }
                 if (!selectedTile || !myTurn) return false;
                 playOnBoard(selectedTile, x, y);
                 return true;
@@ -230,6 +225,7 @@ export function Table({ view }: { view: RoomView }) {
               positionOf={d.position}
             />
             <Announcer message={announcement} />
+            <ThrowTray selfId={view.youId} />
             {turnPos && !myTurn && (
               <div
                 className={`turn-badge at-${turnPos} ${myTurn ? 'mine' : ''}`}
@@ -292,7 +288,6 @@ export function Table({ view }: { view: RoomView }) {
         </div>
       </div>
       <FunLayer players={view.players} youId={view.youId} />
-      <ArmedHint />
       <ChatPanel players={view.players} youId={view.youId} />
       {summaryOpen && view.phase === 'handEnd' && (
         <HandSummary view={view} onHide={() => setHiddenSummary(summaryKey)} />

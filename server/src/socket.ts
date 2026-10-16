@@ -295,7 +295,9 @@ export function attachSocketHandlers(
     );
     socket.on('room:throw', (p, ack) =>
       funAction(ack, (room, id) =>
-        isRecord(p) ? fun.throw(room, id, p.item, p.x, p.y) : { ok: false, code: 'INVALID' },
+        isRecord(p)
+          ? fun.throw(room, id, p.item, { to: p.to, x: p.x, y: p.y })
+          : { ok: false, code: 'INVALID' },
       ),
     );
 

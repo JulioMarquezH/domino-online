@@ -20,6 +20,17 @@ interface FunState {
   ready: Partial<Record<Throwable, number>>;
   /** Until when the table rests from bombs, tornados and quakes. */
   bigReady: number;
+  /** The arsenal strip is on screen (remembered on this device). */
+  tray: boolean;
+}
+
+const TRAY_KEY = 'domino:arsenal';
+function readTray(): boolean {
+  try {
+    return localStorage.getItem(TRAY_KEY) !== 'off';
+  } catch {
+    return true;
+  }
 }
 
 let state: FunState = {
@@ -30,6 +41,7 @@ let state: FunState = {
   armed: null,
   ready: {},
   bigReady: 0,
+  tray: readTray(),
 };
 const listeners = new Set<() => void>();
 const animators = new Set<(e: FunEvent) => void>();
@@ -77,6 +89,17 @@ export function arm(item: Throwable | null): void {
   set({ armed: item });
 }
 
+export function setTray(on: boolean): void {
+  try {
+    localStorage.setItem(TRAY_KEY, on ? 'on' : 'off');
+  } catch {
+    // storage blocked: still toggles for this visit
+  }
+  set({ tray: on, armed: on ? state.armed : null });
+}
+
+export type ThrowTarget = { to: string } | { x: number; y: number };
+
 /** Milliseconds before `item` can be thrown again (yours, or the table's breather). */
 export function waitFor(item: Throwable, now = performance.now()): number {
   const own = (state.ready[item] ?? 0) - now;
@@ -84,10 +107,10 @@ export function waitFor(item: Throwable, now = performance.now()): number {
   return Math.max(0, own, big);
 }
 
-/** Throws the armed thing at a point of the table (x, y in 0..1 of the board). */
-export async function throwAt(item: Throwable, x: number, y: number): Promise<void> {
+/** Throws something at a player or a point of the table (x, y in 0..1 of the board). */
+export async function throwAt(item: Throwable, target: ThrowTarget): Promise<void> {
   set({ armed: null });
-  const res = await emitAck('room:throw', { item, x, y });
+  const res = await emitAck('room:throw', { item, ...target });
   const now = performance.now();
   if (res.ok) {
     set({ ready: { ...state.ready, [item]: now + THROW_COOLDOWN_MS[item] } });

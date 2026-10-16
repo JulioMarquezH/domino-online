@@ -217,8 +217,11 @@ export interface ClientToServerEvents extends TournamentClientToServer {
   'voice:mic': (p: { mic: MicState }) => void;
   'room:chat': (p: { text: string }, ack: (r: Ack) => void) => void;
   'room:react': (p: { emoji: string }, ack: (r: Ack) => void) => void;
-  /** Throw something at a point of the table: x, y in 0..1 of the board. */
-  'room:throw': (p: { item: Throwable; x: number; y: number }, ack: (r: Ack) => void) => void;
+  /** Throw something at a player (`to`) or at a point of the table (x, y in 0..1 of the board). */
+  'room:throw': (
+    p: { item: Throwable; to?: string; x?: number; y?: number },
+    ack: (r: Ack) => void,
+  ) => void;
   'rtc:signal': (p: { to: string; toSession: string; data: SignalPayload }) => void;
 }
 
@@ -257,7 +260,18 @@ export const BIG_THROW_GAP_MS = 10_000;
 export type FunEvent =
   | { id: number; kind: 'chat'; from: string; text: string; at: number }
   | { id: number; kind: 'react'; from: string; emoji: string; at: number }
-  | { id: number; kind: 'throw'; from: string; item: Throwable; x: number; y: number; at: number };
+  | {
+      id: number;
+      kind: 'throw';
+      from: string;
+      item: Throwable;
+      /** A player was the target… */
+      to?: string;
+      /** …or a point of the table (0..1 of the board). */
+      x?: number;
+      y?: number;
+      at: number;
+    };
 
 export function isThrowable(value: unknown): value is Throwable {
   return typeof value === 'string' && (THROWABLES as readonly string[]).includes(value);

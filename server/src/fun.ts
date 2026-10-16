@@ -6,7 +6,6 @@ import {
   isReaction,
   isThrowable,
   type FunEvent,
-  type Throwable,
 } from '@domino/shared';
 import type { Room } from './room';
 
@@ -79,34 +78,37 @@ export class Fun {
     return { ok: true, event: { id: ++f.seq, kind: 'react', from, emoji, at: this.now() } };
   }
 
-  /** Something thrown at a point of the table (x, y in 0..1). Only the looks change. */
-  throw(room: Room, from: string, item: unknown, x: unknown, y: unknown): FunResult {
-    if (!isThrowable(item) || typeof x !== 'number' || typeof y !== 'number') {
+  /** Something thrown at a player or at a point of the table. Only the looks change. */
+  throw(
+    room: Room,
+    from: string,
+    item: unknown,
+    target: { to?: unknown; x?: unknown; y?: unknown },
+  ): FunResult {
+    if (!isThrowable(item)) return { ok: false, code: 'INVALID' };
+    const { to, x, y } = target;
+    const atPlayer = typeof to === 'string';
+    if (atPlayer && (to === from || !room.getPlayer(to))) return { ok: false, code: 'INVALID' };
+    if (
+      !atPlayer &&
+      (typeof x !== 'number' || typeof y !== 'number' || !Number.isFinite(x) || !Number.isFinite(y))
+    ) {
       return { ok: false, code: 'INVALID' };
     }
-    if (!Number.isFinite(x) || !Number.isFinite(y)) return { ok: false, code: 'INVALID' };
     const f = this.of(room);
     const t = this.now();
     const key = `${from}:${item}`;
     const mine = (f.cooldowns.get(key) ?? 0) - t;
     if (mine > 0) return { ok: false, code: 'COOLDOWN', retryInMs: mine };
-    const big = BIG_THROWS.includes(item as Throwable);
+    const big = BIG_THROWS.includes(item);
     if (big && f.bigUntil > t) return { ok: false, code: 'COOLDOWN', retryInMs: f.bigUntil - t };
-    f.cooldowns.set(key, t + THROW_COOLDOWN_MS[item as Throwable]);
+    f.cooldowns.set(key, t + THROW_COOLDOWN_MS[item]);
     if (big) f.bigUntil = t + BIG_THROW_GAP_MS;
     const clamp = (v: number) => Math.round(Math.min(1, Math.max(0, v)) * 1000) / 1000;
-    return {
-      ok: true,
-      event: {
-        id: ++f.seq,
-        kind: 'throw',
-        from,
-        item: item as Throwable,
-        x: clamp(x),
-        y: clamp(y),
-        at: t,
-      },
-    };
+    const where = atPlayer
+      ? { to: to as string }
+      : { x: clamp(x as number), y: clamp(y as number) };
+    return { ok: true, event: { id: ++f.seq, kind: 'throw', from, item, ...where, at: t } };
   }
 
   log(room: Room): FunEvent[] {

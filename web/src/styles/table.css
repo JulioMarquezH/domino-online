@@ -1824,8 +1824,6 @@
 }
 
 .fun-projectile,
-.fun-impact,
-.fun-stain,
 .fun-react {
   position: absolute;
   line-height: 1;
@@ -1836,18 +1834,6 @@
 
 .fun-projectile {
   font-size: clamp(30px, 9dvh, 46px);
-}
-
-.fun-impact {
-  font-size: clamp(44px, 15dvh, 80px);
-}
-
-.impact-bomb {
-  font-size: clamp(64px, 24dvh, 120px);
-}
-
-.fun-stain {
-  font-size: clamp(30px, 10dvh, 48px);
 }
 
 .fun-react {
@@ -2068,11 +2054,7 @@
   z-index: 30;
 }
 
-/* ───────────── arsenal: things thrown at the table ───────────── */
-.arsenal {
-  position: relative;
-}
-
+/* ───────────── arsenal: things thrown at the table or at a player ───────────── */
 .arsenal-btn span {
   font-size: 1.1rem;
   line-height: 1;
@@ -2080,149 +2062,271 @@
 
 .arsenal-btn.is-on {
   border-color: var(--brass-hi);
-  box-shadow: 0 0 14px rgba(243, 217, 151, 0.4);
 }
 
-.arsenal-pop {
+.throw-tray {
+  --gap: 10px;
   position: absolute;
-  z-index: 60;
-  top: calc(100% + 6px);
-  right: 0;
-  width: 230px;
-  padding: 10px;
-  border-radius: 16px;
-  background: rgba(8, 20, 16, 0.97);
-  border: 1px solid var(--line);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
-  animation: card-in 0.2s ease both;
+  z-index: 8;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 14px;
+  background: rgba(3, 12, 9, 0.62);
+  border: 1px solid rgba(217, 176, 100, 0.25);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
 }
 
-.arsenal-pop ul {
-  list-style: none;
-  margin: 6px 0 0;
+.throw-tray.at-bl,
+.throw-tray.at-tl {
+  left: var(--gap);
+}
+
+.throw-tray.at-br,
+.throw-tray.at-tr {
+  right: var(--gap);
+}
+
+.throw-tray.at-bl,
+.throw-tray.at-br {
+  bottom: var(--gap);
+}
+
+.throw-tray.at-tl,
+.throw-tray.at-tr {
+  top: var(--gap);
+}
+
+.tray-item {
+  --left: 0;
+  position: relative;
+  width: clamp(34px, 11dvh, 44px);
+  aspect-ratio: 1;
   padding: 0;
   display: grid;
-  gap: 4px;
+  place-items: center;
+  border: 1px solid rgba(245, 237, 219, 0.12);
+  border-radius: 11px;
+  background: rgba(255, 244, 214, 0.06);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: transform 0.12s;
 }
 
-.arsenal-pop li button {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 42px;
-  padding: 4px 8px;
-  border: 1px solid rgba(245, 237, 219, 0.08);
-  border-radius: 12px;
-  background: rgba(255, 244, 214, 0.04);
-  text-align: left;
-  touch-action: manipulation;
+.tray-item:active:not(:disabled) {
+  transform: scale(0.9);
 }
 
-.arsenal-pop li button:disabled {
-  opacity: 0.45;
-}
-
-.arsenal-pop li button.armed {
+.tray-item.armed {
   border-color: var(--brass-hi);
+  background: rgba(243, 217, 151, 0.22);
+  box-shadow: 0 0 14px rgba(243, 217, 151, 0.5);
 }
 
-.arsenal-emoji {
-  font-size: 1.5rem;
+.tray-emoji {
+  font-size: clamp(18px, 6dvh, 24px);
   line-height: 1;
 }
 
-.arsenal-text {
-  display: grid;
-  line-height: 1.15;
+/* Recharging: a dark sweep that shrinks as the wait runs out. */
+.tray-item.charging::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: conic-gradient(rgba(0, 0, 0, 0.62) calc(var(--left) * 360deg), transparent 0);
 }
 
-.arsenal-text small {
-  color: var(--ink-3);
+.tray-item:disabled .tray-emoji {
+  filter: grayscale(0.7);
+  opacity: 0.6;
+}
+
+.tray-wait {
+  position: absolute;
   font-size: 0.72rem;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 1px 2px #000;
 }
 
-.armed-hint {
+.throw-ghost {
   position: fixed;
-  z-index: 46;
-  left: 50%;
-  top: calc(var(--safe-t) + 6px);
-  translate: -50% 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 6px 4px 14px;
-  border-radius: 999px;
-  font-size: 0.85rem;
-  white-space: nowrap;
-  color: #1b1307;
-  background: linear-gradient(180deg, var(--brass-hi), var(--brass));
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
+  z-index: 120;
+  pointer-events: none;
+  font-size: 40px;
+  line-height: 1;
+  transform: translate(-50%, -60%) scale(1.2);
+  filter: drop-shadow(0 10px 10px rgba(0, 0, 0, 0.5));
 }
 
-.armed-hint .btn {
-  min-height: 30px;
-  color: #1b1307;
+.throw-hover.avatar,
+[data-player-id].throw-hover {
+  outline: 3px solid #ff6b4a;
+  outline-offset: 4px;
 }
 
-.board.is-aiming {
-  cursor: crosshair;
+.board.throw-hover {
   box-shadow:
-    inset 0 0 0 2px rgba(243, 217, 151, 0.7),
+    inset 0 0 0 3px rgba(255, 107, 74, 0.7),
     inset 0 8px 24px rgba(0, 0, 0, 0.55);
 }
 
-.board:not(.can-inspect) .board-tile {
-  cursor: default;
+.armed-hint {
+  position: absolute;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px 3px 12px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  color: #1b1307;
+  background: linear-gradient(180deg, var(--brass-hi), var(--brass));
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
 }
 
-.splat,
-.shockwave {
+.throw-tray.at-br .armed-hint,
+.throw-tray.at-tr .armed-hint {
+  left: auto;
+  right: 0;
+}
+
+.throw-tray.at-bl .armed-hint,
+.throw-tray.at-br .armed-hint {
+  bottom: calc(100% + 6px);
+}
+
+.throw-tray.at-tl .armed-hint,
+.throw-tray.at-tr .armed-hint {
+  top: calc(100% + 6px);
+}
+
+.armed-hint .btn {
+  min-height: 26px;
+  color: #1b1307;
+}
+
+.fun-shadow,
+.fun-bit,
+.fun-smoke,
+.fun-flash,
+.fun-shockwave,
+.fun-stain,
+.fun-drip,
+.fun-big {
   position: absolute;
   pointer-events: none;
   transform: translate(-50%, -50%);
   will-change: transform, opacity;
 }
 
-.splat {
-  width: clamp(54px, 18dvh, 110px);
-  aspect-ratio: 1.15;
-  border-radius: 46% 54% 41% 59% / 52% 38% 62% 48%;
-}
-
-.splat-tomato {
-  background:
-    radial-gradient(circle at 30% 70%, rgba(200, 20, 20, 0.85) 0 9%, transparent 10%),
-    radial-gradient(circle at 78% 30%, rgba(200, 20, 20, 0.85) 0 7%, transparent 8%),
-    radial-gradient(
-      circle at 50% 50%,
-      #d42a1e 0 38%,
-      rgba(170, 18, 12, 0.9) 39% 52%,
-      transparent 53%
-    );
-  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.35));
-}
-
-.splat-egg {
-  background:
-    radial-gradient(circle at 46% 46%, #ffc52e 0 15%, #f2a900 16% 19%, transparent 20%),
-    radial-gradient(
-      ellipse at 50% 50%,
-      #fffdf6 0 46%,
-      rgba(255, 253, 246, 0.9) 47% 50%,
-      transparent 52%
-    );
-  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.35));
-}
-
-.shockwave {
-  width: clamp(160px, 70dvh, 420px);
-  aspect-ratio: 1;
+.fun-shadow {
+  width: 34px;
+  height: 12px;
   border-radius: 50%;
-  border: 6px solid rgba(255, 220, 150, 0.85);
-  box-shadow: 0 0 40px rgba(255, 180, 80, 0.6);
+  background: radial-gradient(ellipse, rgba(0, 0, 0, 0.55), transparent 70%);
 }
 
-.impact-tornado {
+.fun-bit {
+  border-radius: 50%;
+}
+
+.fun-smoke {
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(70, 70, 70, 0.75),
+    rgba(40, 40, 40, 0.35) 55%,
+    transparent 70%
+  );
+}
+
+.fun-flash {
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 240, 0.95),
+    rgba(255, 200, 90, 0.7) 30%,
+    rgba(255, 120, 40, 0.25) 55%,
+    transparent 70%
+  );
+}
+
+.fun-shockwave {
+  border-radius: 50%;
+  border: 5px solid rgba(255, 225, 160, 0.85);
+  box-shadow: 0 0 30px rgba(255, 170, 70, 0.6);
+}
+
+.fun-stain {
+  border-radius: 47% 53% 42% 58% / 55% 40% 60% 45%;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.35));
+}
+
+.fun-stain span {
+  position: absolute;
+  border-radius: 50%;
+}
+
+.stain-tomato {
+  background:
+    radial-gradient(circle at 38% 34%, rgba(255, 190, 170, 0.55) 0 8%, transparent 16%),
+    radial-gradient(circle at 60% 62%, rgba(255, 220, 120, 0.35) 0 5%, transparent 9%),
+    radial-gradient(circle at 46% 46%, rgba(226, 50, 36, 0.92) 0 46%, rgba(160, 20, 12, 0.88) 72%);
+}
+
+.stain-tomato span {
+  background: #b3180f;
+}
+
+.stain-egg {
+  background:
+    radial-gradient(circle at 48% 46%, #ffc52e 0 21%, #f0a400 23% 26%, transparent 27%),
+    radial-gradient(circle, #fffdf6 0 60%, #f1ead8 100%);
+}
+
+.stain-egg span {
+  background: #fffaf0;
+}
+
+.fun-drip {
+  width: 7px;
+  height: 14px;
+  border-radius: 50% 50% 50% 50% / 30% 30% 70% 70%;
+}
+
+.drip-tomato {
+  background: #c41d14;
+}
+
+.drip-egg {
+  background: #ffc52e;
+}
+
+.fun-big {
+  line-height: 1;
+  filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.45));
+}
+
+.big-boom {
+  font-size: clamp(70px, 26dvh, 130px);
+}
+
+.big-tornado {
   font-size: clamp(60px, 24dvh, 120px);
+}
+
+.big-tornado-sm {
+  font-size: clamp(44px, 14dvh, 70px);
+}
+
+@media (max-height: 430px) {
+  .throw-tray {
+    --gap: 6px;
+    padding: 3px;
+    gap: 3px;
+  }
 }

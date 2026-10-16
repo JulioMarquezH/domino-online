@@ -105,34 +105,66 @@ try {
   assert((await ana.locator('.tile-info').count()) === 0, 'no "who played it" during the hand');
   log('mid-hand: tapping a tile reveals nothing');
 
-  const aimAt = async (page, label, fx, fy) => {
-    await page.getByRole('button', { name: 'Lanzar algo a la mesa' }).click();
-    await page.getByRole('button', { name: new RegExp(`^${label}:`) }).click();
-    await page.locator('.armed-hint').waitFor();
-    const b = await page.locator('.board').boundingBox();
-    await page.mouse.click(b.x + b.width * fx, b.y + b.height * fy);
+  const item = (page, label) => page.locator(`.tray-item[title="${label}"]`);
+  const center = async (loc) => {
+    const b = await loc.boundingBox();
+    return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
   };
+  const onBoard = async (page, fx, fy) => {
+    const b = await page.locator('.board').boundingBox();
+    return { x: b.x + b.width * fx, y: b.y + b.height * fy };
+  };
+  // One gesture: press the thing in the tray, drag it to the target, let go.
+  const dragTo = async (page, label, to) => {
+    const from = await center(item(page, label));
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(from.x + 20, from.y - 20, { steps: 3 });
+    await page.mouse.move(to.x, to.y, { steps: 8 });
+    await page.mouse.up();
+  };
+  // Or two taps: the thing, then where it goes.
+  const tapTap = async (page, label, to) => {
+    await item(page, label).click();
+    await page.locator('.armed-hint').waitFor();
+    await page.screenshot({ path: `${OUT}/fun-05a-armed.png` });
+    await page.mouse.click(to.x, to.y);
+  };
+  const bobId = (await view(beto)).youId;
+  const bot = (await view(ana)).players.find((p) => p.isBot);
 
-  // Tomato on the felt: Beto sees it fly from Ana's seat and the stain stay.
-  await aimAt(ana, 'Tomate', 0.3, 0.4);
+  // Tomato dragged onto the felt: Beto sees it fly from Ana's seat and the stain stay.
+  await dragTo(ana, 'Tomate', await onBoard(ana, 0.3, 0.4));
   await beto.locator('.fun-projectile').waitFor({ timeout: 3000 });
-  await beto.waitForTimeout(320);
+  await beto.waitForTimeout(300);
   await beto.screenshot({ path: `${OUT}/fun-03-tomato-flying.png` });
-  await beto.locator('.splat-tomato').waitFor({ timeout: 3000 });
-  await beto.waitForTimeout(500);
+  await beto.locator('.stain-tomato').waitFor({ timeout: 3000 });
+  await beto.waitForTimeout(400);
   await beto.screenshot({ path: `${OUT}/fun-04-tomato-splat.png` });
-  log('tomato: flies to the tapped spot and stains the felt');
+  log('tomato: one drag, flies to the spot and stains the felt');
 
-  // Cooldown: the tomato is recharging for Ana.
-  await ana.getByRole('button', { name: 'Lanzar algo a la mesa' }).click();
-  assert(await ana.getByRole('button', { name: /^Tomate:/ }).isDisabled(), 'tomato recharging');
+  // Cooldown: the tomato is recharging for Ana, with the seconds showing.
+  assert(await item(ana, 'Tomate').isDisabled(), 'tomato recharging');
   assert(
-    (await ana.locator('.arsenal-pop', { hasText: /en \d+ s/ }).count()) === 1,
+    /^\d+$/.test(await item(ana, 'Tomate').locator('.tray-wait').innerText()),
     'shows the wait',
   );
-  await ana.keyboard.press('Escape');
-  await ana.mouse.click(5, 200);
-  log('cooldown: the tomato shows "en N s" and is disabled');
+  log('cooldown: the tomato shows the seconds left and is disabled');
+
+  // Egg with two taps, straight at Beto: he gets it in the face.
+  await tapTap(
+    ana,
+    'Huevo',
+    await center(ana.locator(`.table-screen [data-player-id="${bobId}"]`)),
+  );
+  await beto.locator('.stain-egg').waitFor({ timeout: 3000 });
+  const face = await center(beto.locator(`.table-screen [data-player-id="${bobId}"]`));
+  const splat = await center(beto.locator('.stain-egg'));
+  assert(Math.hypot(face.x - splat.x, face.y - splat.y) < 12, 'the egg lands on Beto');
+  await beto.waitForTimeout(500);
+  await beto.screenshot({ path: `${OUT}/fun-05-egg-on-beto.png` });
+  assert((await ana.locator('.armed-hint').count()) === 0, 'disarmed after the throw');
+  log('egg: tap + tap at Beto, it lands on his avatar');
 
   // Bomb: tiles fly off and come back to exactly where they were.
   const boxes = () =>
@@ -142,42 +174,44 @@ try {
         return `${Math.round(r.x)},${Math.round(r.y)}`;
       }),
     );
+  const knocked = () =>
+    ana.evaluate(
+      () =>
+        [...document.querySelectorAll('.board .board-tile')].filter((t) =>
+          t.getAnimations().some((a) => !(a instanceof CSSAnimation)),
+        ).length,
+    );
   const before = await boxes();
-  await aimAt(beto, 'Bomba', 0.5, 0.5);
-  await ana.locator('.impact-bomb').waitFor({ timeout: 3000 });
-  await ana.waitForTimeout(500);
-  const moving = await ana.evaluate(
-    () =>
-      [...document.querySelectorAll('.board .board-tile')].filter((t) =>
-        t.getAnimations().some((a) => !(a instanceof CSSAnimation)),
-      ).length,
-  );
+  await dragTo(beto, 'Bomba', await onBoard(beto, 0.5, 0.5));
+  await ana.locator('.big-boom').waitFor({ timeout: 3000 });
+  await ana.waitForTimeout(250);
+  await ana.screenshot({ path: `${OUT}/fun-06-bomb.png` });
+  const moving = await knocked();
   assert(moving >= 2, `bomb knocks the tiles around (${moving})`);
-  await ana.screenshot({ path: `${OUT}/fun-05-bomb.png` });
-  await ana.waitForTimeout(3600);
-  const settled = await ana.evaluate(
-    () =>
-      [...document.querySelectorAll('.board .board-tile')].filter((t) =>
-        t.getAnimations().some((a) => !(a instanceof CSSAnimation)),
-      ).length,
-  );
-  assert(settled === 0, 'tiles are back in place after the bomb');
+  await ana.waitForTimeout(500);
+  await ana.screenshot({ path: `${OUT}/fun-07-bomb-scattered.png` });
+  await ana.waitForTimeout(3400);
+  assert((await knocked()) === 0, 'tiles are back in place after the bomb');
   assert((await boxes()).join() === before.join(), 'every tile is back exactly where it was');
   log(`bomb: ${moving} tiles blown away, all back in place`);
 
   // The table's breather: right after a bomb nobody can throw a tornado.
-  await ana.getByRole('button', { name: 'Lanzar algo a la mesa' }).click();
-  const tornadoReady = !(await ana.getByRole('button', { name: /^Tornado:/ }).isDisabled());
-  log(`breather: tornado ${tornadoReady ? 'ready again (10 s passed)' : 'waiting'}`);
-  await ana.mouse.click(5, 200);
+  assert(await item(ana, 'Tornado').isDisabled(), 'tornado waits for the breather');
+  log('breather: tornado waits after the bomb');
 
-  // Tornado and quake (after the breather).
+  // Tornado dragged onto an AI's avatar (after the breather).
   await ana.waitForTimeout(6500);
-  await aimAt(ana, 'Tornado', 0.6, 0.5);
-  await beto.locator('.impact-tornado').waitFor({ timeout: 3000 });
-  await beto.waitForTimeout(1200);
-  await beto.screenshot({ path: `${OUT}/fun-06-tornado.png` });
-  log('tornado: tiles swirl around the spot');
+  await item(ana, 'Tornado').waitFor();
+  assert(!(await item(ana, 'Tornado').isDisabled()), 'tornado ready again');
+  await dragTo(
+    ana,
+    'Tornado',
+    await center(ana.locator(`.table-screen [data-player-id="${bot.id}"]`)),
+  );
+  await beto.locator('.big-tornado-sm').waitFor({ timeout: 3000 });
+  await beto.waitForTimeout(700);
+  await beto.screenshot({ path: `${OUT}/fun-08-tornado-on-ai.png` });
+  log('tornado: dragged onto an AI, it spins');
   log('ALL CHECKS PASSED');
 } finally {
   await browser.close();
