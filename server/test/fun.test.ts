@@ -38,15 +38,24 @@ describe('chat, reactions and throwables', () => {
     ]);
   });
 
-  it('throws only known things at someone else in the room', () => {
-    const { room, a, b, fun } = setup();
-    expect(fun.throw(room, a, b, 'tomato')).toMatchObject({
+  it('throws things at a point of the table, with cooldowns', () => {
+    const { clock, room, a, b, fun } = setup();
+    expect(fun.throw(room, a, 'tomato', 0.4, 1.7)).toMatchObject({
       ok: true,
-      event: { kind: 'throw', from: a, to: b, item: 'tomato' },
+      event: { kind: 'throw', from: a, item: 'tomato', x: 0.4, y: 1 },
     });
-    expect(fun.throw(room, a, a, 'bomb')).toEqual({ ok: false, code: 'INVALID' });
-    expect(fun.throw(room, a, 'nobody', 'bomb')).toEqual({ ok: false, code: 'INVALID' });
-    expect(fun.throw(room, a, b, 'piano')).toEqual({ ok: false, code: 'INVALID' });
+    // Same thing again too soon: the remaining wait comes back.
+    expect(fun.throw(room, a, 'tomato', 0.5, 0.5)).toMatchObject({ ok: false, code: 'COOLDOWN' });
+    expect(fun.throw(room, a, 'egg', 0.5, 0.5)).toMatchObject({ ok: true });
+    // One big one for the whole table, then a breather for everybody.
+    expect(fun.throw(room, a, 'bomb', 0.5, 0.5)).toMatchObject({ ok: true });
+    const wait = fun.throw(room, b, 'tornado', 0.5, 0.5);
+    expect(wait).toMatchObject({ ok: false, code: 'COOLDOWN' });
+    expect((wait as { retryInMs: number }).retryInMs).toBe(10_000);
+    clock.advance(10_000);
+    expect(fun.throw(room, b, 'tornado', 0.5, 0.5)).toMatchObject({ ok: true });
+    expect(fun.throw(room, a, 'piano', 0.5, 0.5)).toEqual({ ok: false, code: 'INVALID' });
+    expect(fun.throw(room, a, 'tomato', Number.NaN, 0.5)).toEqual({ ok: false, code: 'INVALID' });
     expect(fun.react(room, a, '🔥')).toMatchObject({ ok: true });
     expect(fun.react(room, a, '<script>')).toEqual({ ok: false, code: 'INVALID' });
   });

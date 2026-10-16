@@ -1,4 +1,10 @@
-import type { FunEvent, Throwable } from '@domino/shared';
+import {
+  BIG_THROWS,
+  BIG_THROW_GAP_MS,
+  THROW_COOLDOWN_MS,
+  type FunEvent,
+  type Throwable,
+} from '@domino/shared';
 import { useSyncExternalStore } from 'react';
 import { emitAck, getClientState, socket } from './client';
 
@@ -8,9 +14,23 @@ interface FunState {
   chat: Extract<FunEvent, { kind: 'chat' }>[];
   unread: number;
   open: boolean;
+  /** The thing you picked from the arsenal: your next tap on the table throws it. */
+  armed: Throwable | null;
+  /** performance.now() until which each thing is still recharging. */
+  ready: Partial<Record<Throwable, number>>;
+  /** Until when the table rests from bombs, tornados and quakes. */
+  bigReady: number;
 }
 
-let state: FunState = { roomId: null, chat: [], unread: 0, open: false };
+let state: FunState = {
+  roomId: null,
+  chat: [],
+  unread: 0,
+  open: false,
+  armed: null,
+  ready: {},
+  bigReady: 0,
+};
 const listeners = new Set<() => void>();
 const animators = new Set<(e: FunEvent) => void>();
 
@@ -42,7 +62,9 @@ function currentRoom(): string | null {
 
 function forRoom(): void {
   const roomId = currentRoom();
-  if (roomId !== state.roomId) set({ roomId, chat: [], unread: 0, open: false });
+  if (roomId !== state.roomId) {
+    set({ roomId, chat: [], unread: 0, open: false, armed: null, ready: {}, bigReady: 0 });
+  }
 }
 
 export function setChatOpen(open: boolean): void {
@@ -51,7 +73,30 @@ export function setChatOpen(open: boolean): void {
 
 export const sendChat = (text: string) => emitAck('room:chat', { text });
 export const sendReaction = (emoji: string) => emitAck('room:react', { emoji });
-export const throwAt = (to: string, item: Throwable) => emitAck('room:throw', { to, item });
+export function arm(item: Throwable | null): void {
+  set({ armed: item });
+}
+
+/** Milliseconds before `item` can be thrown again (yours, or the table's breather). */
+export function waitFor(item: Throwable, now = performance.now()): number {
+  const own = (state.ready[item] ?? 0) - now;
+  const big = BIG_THROWS.includes(item) ? state.bigReady - now : 0;
+  return Math.max(0, own, big);
+}
+
+/** Throws the armed thing at a point of the table (x, y in 0..1 of the board). */
+export async function throwAt(item: Throwable, x: number, y: number): Promise<void> {
+  set({ armed: null });
+  const res = await emitAck('room:throw', { item, x, y });
+  const now = performance.now();
+  if (res.ok) {
+    set({ ready: { ...state.ready, [item]: now + THROW_COOLDOWN_MS[item] } });
+  } else if (res.code === 'COOLDOWN' && 'retryAfterMs' in res && res.retryAfterMs) {
+    const until = now + res.retryAfterMs;
+    if (BIG_THROWS.includes(item)) set({ bigReady: Math.max(state.bigReady, until) });
+    else set({ ready: { ...state.ready, [item]: until } });
+  }
+}
 
 socket.on('room:funlog', ({ events }) => {
   forRoom();
@@ -66,6 +111,9 @@ socket.on('room:fun', (e) => {
       chat: [...state.chat, e].slice(-60),
       unread: state.open || mine ? state.unread : state.unread + 1,
     });
+  }
+  if (e.kind === 'throw' && BIG_THROWS.includes(e.item)) {
+    set({ bigReady: performance.now() + BIG_THROW_GAP_MS });
   }
   animators.forEach((fn) => fn(e));
 });

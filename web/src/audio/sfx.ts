@@ -104,9 +104,11 @@ export const sfx = {
     } else if (item === 'tomato' || item === 'egg') {
       noiseBurst(ctx, 0.18, 700, 0.4, 'lowpass', 300);
       tone(ctx, 160, 70, 0.12, 0.3, 'triangle');
-    } else if (item === 'chancla') {
-      tone(ctx, 300, 120, 0.09, 0.45, 'square');
-      noiseBurst(ctx, 0.05, 3000, 0.25, 'highpass', 1500);
+    } else if (item === 'tornado') {
+      noiseBurst(ctx, 2.6, 300, 0.32, 'bandpass', 2600);
+    } else if (item === 'quake') {
+      noiseBurst(ctx, 1.8, 140, 0.6, 'lowpass', 60);
+      tone(ctx, 55, 35, 1.6, 0.4, 'sine');
     } else {
       // rose, kiss: something sweet
       [880, 1175, 1568].forEach((f, i) => {

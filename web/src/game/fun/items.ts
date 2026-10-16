@@ -1,11 +1,10 @@
 import type { Throwable } from '@domino/shared';
 
-/** What can be thrown, how it looks flying and what it leaves when it lands. */
-export const THROW_ITEMS: Record<Throwable, { emoji: string; impact: string; label: string }> = {
-  tomato: { emoji: '🍅', impact: '💦', label: 'Tomate' },
-  egg: { emoji: '🥚', impact: '🍳', label: 'Huevo' },
-  bomb: { emoji: '💣', impact: '💥', label: 'Bomba' },
-  chancla: { emoji: '🩴', impact: '💫', label: 'Chancla' },
-  rose: { emoji: '🌹', impact: '🌸', label: 'Rosa' },
-  kiss: { emoji: '💋', impact: '💕', label: 'Beso' },
+/** What can be thrown at the table and what it does there. */
+export const THROW_ITEMS: Record<Throwable, { emoji: string; label: string; does: string }> = {
+  tomato: { emoji: '🍅', label: 'Tomate', does: 'Mancha la mesa' },
+  egg: { emoji: '🥚', label: 'Huevo', does: 'Un huevo frito en la mesa' },
+  bomb: { emoji: '💣', label: 'Bomba', does: 'Las fichas salen volando' },
+  tornado: { emoji: '🌪️', label: 'Tornado', does: 'Las fichas dan vueltas' },
+  quake: { emoji: '🫨', label: 'Terremoto', does: 'Tiembla toda la mesa' },
 };

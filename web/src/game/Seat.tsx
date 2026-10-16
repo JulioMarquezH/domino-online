@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from 'react';
 import { Avatar } from '../ui/Avatar';
 import { TileBack } from '../ui/Tile';
 import { PeerVoiceControl } from '../ui/VoiceControls';
-import { ThrowPicker } from './fun/Pickers';
 
 interface Props {
   player: PublicPlayer;
@@ -49,7 +48,7 @@ export function Seat({ player, position, isTurn, isPartner, dealKey, passedAt }:
           team={team}
           isSelf={false}
           active={isTurn}
-          onClick={() => setOpen((o) => !o)}
+          onClick={player.isBot ? undefined : () => setOpen((o) => !o)}
         />
         <div className="seat-text">
           <span className="seat-name">{player.name}</span>
@@ -79,8 +78,7 @@ export function Seat({ player, position, isTurn, isPartner, dealKey, passedAt }:
       {open && (
         <div className="voice-pop" role="dialog" aria-label={player.name}>
           <span className="voice-pop-title">{player.name}</span>
-          {!player.isBot && <PeerVoiceControl player={player} />}
-          <ThrowPicker target={player} onDone={() => setOpen(false)} />
+          <PeerVoiceControl player={player} />
         </div>
       )}
     </div>

@@ -15,6 +15,10 @@ interface Props {
   positionOf: (seat: Seat) => ScreenPosition;
   /** "Tú" or the player's name. */
   nameOf: (seat: Seat) => string;
+  /** Who played each tile can only be checked once the hand is over (no memory aid mid-hand). */
+  revealPlays: boolean;
+  /** Something armed from the arsenal: taps aim at the table. */
+  aiming: boolean;
 }
 
 const ENTER_FROM: Record<ScreenPosition, [number, number]> = {
@@ -34,6 +38,8 @@ export function Board({
   onBoardTap,
   positionOf,
   nameOf,
+  revealPlays,
+  aiming,
 }: Props) {
   // Tapping a played tile says who played it and when.
   const [info, setInfo] = useState<string | null>(null);
@@ -58,7 +64,7 @@ export function Board({
   const oy = size.h / 2 - ((b.minY + b.maxY) / 2) * unit;
   const seatByTile = new Map(line.map((t) => [t.tile, t.seat]));
   const placed = new Map(line.map((t) => [t.tile, t]));
-  const infoBox = info ? layout.tiles.find((t) => t.key === info) : undefined;
+  const infoBox = info && revealPlays ? layout.tiles.find((t) => t.key === info) : undefined;
   const infoTile = info ? placed.get(info) : undefined;
 
   const boxStyle = (cx: number, cy: number, angle: number): CSSProperties => ({
@@ -69,13 +75,14 @@ export function Board({
 
   return (
     <div
-      className="board"
+      className={`board ${aiming ? 'is-aiming' : ''} ${revealPlays ? 'can-inspect' : ''}`}
       ref={ref}
       data-unit={unit.toFixed(1)}
       onClick={(e) => {
         const el = e.target as HTMLElement;
         if (el.closest('[data-end-target]')) return;
         if (onBoardTap(e.clientX, e.clientY)) return;
+        if (!revealPlays) return;
         const tile = el.closest<HTMLElement>('.board-tile')?.dataset.tile ?? null;
         setInfo(tile && tile !== info ? tile : null);
       }}

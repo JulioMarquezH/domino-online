@@ -217,7 +217,8 @@ export interface ClientToServerEvents extends TournamentClientToServer {
   'voice:mic': (p: { mic: MicState }) => void;
   'room:chat': (p: { text: string }, ack: (r: Ack) => void) => void;
   'room:react': (p: { emoji: string }, ack: (r: Ack) => void) => void;
-  'room:throw': (p: { to: string; item: Throwable }, ack: (r: Ack) => void) => void;
+  /** Throw something at a point of the table: x, y in 0..1 of the board. */
+  'room:throw': (p: { item: Throwable; x: number; y: number }, ack: (r: Ack) => void) => void;
   'rtc:signal': (p: { to: string; toSession: string; data: SignalPayload }) => void;
 }
 
@@ -236,13 +237,27 @@ export interface ServerToClientEvents extends TournamentServerToClient {
 
 export const CHAT_MAX_LENGTH = 140;
 export const REACTIONS = ['😂', '🔥', '👏', '😱', '😡', '🤡', '💩', '🙏', '😎', '🥱'] as const;
-export const THROWABLES = ['tomato', 'egg', 'bomb', 'chancla', 'rose', 'kiss'] as const;
+export const THROWABLES = ['tomato', 'egg', 'bomb', 'tornado', 'quake'] as const;
 export type Throwable = (typeof THROWABLES)[number];
+
+/**
+ * How long you wait before throwing the same thing again. The big ones (they shake the tiles
+ * around) also give the whole table a breather: one of them every BIG_THROW_GAP_MS at most.
+ */
+export const THROW_COOLDOWN_MS: Record<Throwable, number> = {
+  tomato: 8_000,
+  egg: 8_000,
+  quake: 25_000,
+  tornado: 40_000,
+  bomb: 40_000,
+};
+export const BIG_THROWS: readonly Throwable[] = ['bomb', 'tornado', 'quake'];
+export const BIG_THROW_GAP_MS = 10_000;
 
 export type FunEvent =
   | { id: number; kind: 'chat'; from: string; text: string; at: number }
   | { id: number; kind: 'react'; from: string; emoji: string; at: number }
-  | { id: number; kind: 'throw'; from: string; to: string; item: Throwable; at: number };
+  | { id: number; kind: 'throw'; from: string; item: Throwable; x: number; y: number; at: number };
 
 export function isThrowable(value: unknown): value is Throwable {
   return typeof value === 'string' && (THROWABLES as readonly string[]).includes(value);

@@ -279,7 +279,7 @@ export function attachSocketHandlers(
       }
       const res = run(s.room, s.playerId);
       if (!res.ok) {
-        reply({ ok: false, code: res.code });
+        reply({ ok: false, code: res.code, retryAfterMs: res.retryInMs });
         return;
       }
       for (const p of s.room.players) {
@@ -295,7 +295,7 @@ export function attachSocketHandlers(
     );
     socket.on('room:throw', (p, ack) =>
       funAction(ack, (room, id) =>
-        fun.throw(room, id, isRecord(p) ? p.to : null, isRecord(p) ? p.item : null),
+        isRecord(p) ? fun.throw(room, id, p.item, p.x, p.y) : { ok: false, code: 'INVALID' },
       ),
     );
 

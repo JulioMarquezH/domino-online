@@ -1,4 +1,7 @@
 import {
+  BIG_THROWS,
+  BIG_THROW_GAP_MS,
+  THROW_COOLDOWN_MS,
   cleanChatText,
   isReaction,
   isThrowable,
@@ -11,7 +14,6 @@ import type { Room } from './room';
 const LIMITS = {
   chat: { max: 5, windowMs: 5_000 },
   react: { max: 6, windowMs: 4_000 },
-  throw: { max: 4, windowMs: 4_000 },
 } as const;
 const CHAT_LOG = 30;
 
@@ -21,9 +23,14 @@ interface RoomFun {
   seq: number;
   chat: FunEvent[];
   recent: Map<string, number[]>;
+  /** `${playerId}:${item}` → when that player may throw it again. */
+  cooldowns: Map<string, number>;
+  /** When the table may take the next big one (bomb, tornado, quake). */
+  bigUntil: number;
 }
 
-export type FunResult = { ok: true; event: FunEvent } | { ok: false; code: string };
+export type FunResult =
+  { ok: true; event: FunEvent } | { ok: false; code: string; retryInMs?: number };
 
 /** Chat, reactions and things thrown at people. Nothing here touches the game. */
 export class Fun {
@@ -34,7 +41,7 @@ export class Fun {
   private of(room: Room): RoomFun {
     let f = this.rooms.get(room);
     if (!f) {
-      f = { seq: 0, chat: [], recent: new Map() };
+      f = { seq: 0, chat: [], recent: new Map(), cooldowns: new Map(), bigUntil: 0 };
       this.rooms.set(room, f);
     }
     return f;
@@ -72,15 +79,33 @@ export class Fun {
     return { ok: true, event: { id: ++f.seq, kind: 'react', from, emoji, at: this.now() } };
   }
 
-  throw(room: Room, from: string, to: unknown, item: unknown): FunResult {
-    if (typeof to !== 'string' || to === from || !room.getPlayer(to) || !isThrowable(item)) {
+  /** Something thrown at a point of the table (x, y in 0..1). Only the looks change. */
+  throw(room: Room, from: string, item: unknown, x: unknown, y: unknown): FunResult {
+    if (!isThrowable(item) || typeof x !== 'number' || typeof y !== 'number') {
       return { ok: false, code: 'INVALID' };
     }
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return { ok: false, code: 'INVALID' };
     const f = this.of(room);
-    if (!this.allowed(f, from, 'throw')) return { ok: false, code: 'SLOW_DOWN' };
+    const t = this.now();
+    const key = `${from}:${item}`;
+    const mine = (f.cooldowns.get(key) ?? 0) - t;
+    if (mine > 0) return { ok: false, code: 'COOLDOWN', retryInMs: mine };
+    const big = BIG_THROWS.includes(item as Throwable);
+    if (big && f.bigUntil > t) return { ok: false, code: 'COOLDOWN', retryInMs: f.bigUntil - t };
+    f.cooldowns.set(key, t + THROW_COOLDOWN_MS[item as Throwable]);
+    if (big) f.bigUntil = t + BIG_THROW_GAP_MS;
+    const clamp = (v: number) => Math.round(Math.min(1, Math.max(0, v)) * 1000) / 1000;
     return {
       ok: true,
-      event: { id: ++f.seq, kind: 'throw', from, to, item: item as Throwable, at: this.now() },
+      event: {
+        id: ++f.seq,
+        kind: 'throw',
+        from,
+        item: item as Throwable,
+        x: clamp(x),
+        y: clamp(y),
+        at: t,
+      },
     };
   }
 

@@ -27,7 +27,8 @@ import { Seat } from './Seat';
 import { ChatButton } from './fun/ChatButton';
 import { ChatPanel } from './fun/ChatPanel';
 import { FunLayer } from './fun/FunLayer';
-import { ReactionPicker } from './fun/Pickers';
+import { ArmedHint, ArsenalButton } from './fun/Arsenal';
+import { throwAt, useFun } from '../net/fun';
 
 export function Table({ view }: { view: RoomView }) {
   const d = derive(view);
@@ -48,7 +49,7 @@ export function Table({ view }: { view: RoomView }) {
   const canPassNow = myTurn && canPass(hand, line);
   const selectedTile = selected && hand.includes(selected) ? selected : null;
 
-  const [reacting, setReacting] = useState(false);
+  const { armed } = useFun();
   // The end-of-hand / end-of-match summary can be put away to look at the table, and reopened.
   const [hiddenSummary, setHiddenSummary] = useState<string | null>(null);
   const summaryKey = `${view.phase}:${g?.handNumber ?? 0}`;
@@ -214,11 +215,18 @@ export function Table({ view }: { view: RoomView }) {
                 if (selectedTile) void attempt(selectedTile, end);
               }}
               onBoardTap={(x, y) => {
+                if (armed) {
+                  const b = document.querySelector('.board')?.getBoundingClientRect();
+                  if (b) void throwAt(armed, (x - b.left) / b.width, (y - b.top) / b.height);
+                  return true;
+                }
                 if (!selectedTile || !myTurn) return false;
                 playOnBoard(selectedTile, x, y);
                 return true;
               }}
               nameOf={(seat) => (seat === mySeat ? 'Tú' : d.nameAt(seat))}
+              revealPlays={atSummary}
+              aiming={armed !== null}
               positionOf={d.position}
             />
             <Announcer message={announcement} />
@@ -252,20 +260,7 @@ export function Table({ view }: { view: RoomView }) {
         </div>
         <div className="cell c-bottom-left">
           <div className={`self-seat ${myTurn ? 'is-turn' : ''}`}>
-            {d.me && (
-              <Avatar
-                player={d.me}
-                team={d.myTeam}
-                isSelf
-                active={myTurn}
-                onClick={() => setReacting((r) => !r)}
-              />
-            )}
-            {reacting && (
-              <div className="voice-pop self-pop" role="dialog" aria-label="Reaccionar">
-                <ReactionPicker onDone={() => setReacting(false)} />
-              </div>
-            )}
+            {d.me && <Avatar player={d.me} team={d.myTeam} isSelf active={myTurn} />}
             <span className="self-label">{myTurn ? '¡Te toca!' : 'Tú'}</span>
           </div>
         </div>
@@ -297,6 +292,7 @@ export function Table({ view }: { view: RoomView }) {
         </div>
       </div>
       <FunLayer players={view.players} youId={view.youId} />
+      <ArmedHint />
       <ChatPanel players={view.players} youId={view.youId} />
       {summaryOpen && view.phase === 'handEnd' && (
         <HandSummary view={view} onHide={() => setHiddenSummary(summaryKey)} />
@@ -326,6 +322,7 @@ function TableControls() {
   return (
     <div className="table-controls">
       <FullscreenButton />
+      <ArsenalButton />
       <ChatButton />
       <SelfMicButton compact />
       <button
