@@ -155,6 +155,13 @@
     inset 0 0 80px rgba(0, 0, 0, 0.4);
 }
 
+.board-stains {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
 .snake-layer {
   position: absolute;
   inset: 0;
@@ -2063,7 +2070,8 @@
 .throw-btn {
   --left: 0;
   position: absolute;
-  left: calc(100% + 6px);
+  /* Clear of the avatar even when it grows and gets its ring on your turn. */
+  left: calc(106% + 14px);
   top: 50%;
   translate: 0 -50%;
   width: clamp(30px, 9dvh, 40px);

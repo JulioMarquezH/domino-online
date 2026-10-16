@@ -160,6 +160,8 @@ function big(host: HTMLElement, p: Pt, text: string, cls: string, frames: Keyfra
 }
 
 /** The splat left behind: a blob with drops around it that fades slowly. */
+const MAX_TABLE_STAINS = 4;
+
 function stain(host: HTMLElement, p: Pt, kind: string, size: number, ms: number) {
   const blob = sized(spawn(host, `fun-stain stain-${kind}`, p), size);
   // Turned inside the transform: the `rotate` property would spin it off its centre.
@@ -337,7 +339,12 @@ function hitBoard(host: HTMLElement, board: HTMLElement, item: string, p: Pt) {
       ms: 650,
       up: 10,
     });
-    stain(host, p, item, unit * 0.3, 7500);
+    // On the felt under the tiles, and only a few at a time: the game always stays readable.
+    const felt = board.querySelector<HTMLElement>('.board-stains');
+    if (felt) {
+      while (felt.childElementCount >= MAX_TABLE_STAINS) felt.firstElementChild?.remove();
+      stain(felt, { x: p.x - r.left, y: p.y - r.top }, item, unit * 0.3, 7500);
+    }
     // The nearby tiles jump a little from the splash.
     for (const t of tiles) {
       const d = Math.hypot(t.x - p.x, t.y - p.y);

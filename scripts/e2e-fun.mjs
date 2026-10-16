@@ -150,6 +150,10 @@ try {
   await beto.waitForTimeout(400);
   await beto.screenshot({ path: `${OUT}/fun-04-tomato-splat.png` });
   assert((await beto.locator('.stain-tomato').count()) === 1, 'no second tomato while recharging');
+  assert(
+    (await beto.locator('.board .board-stains .stain-tomato').count()) === 1,
+    'the splat lies on the felt, under the tiles',
+  );
   const flying = () => beto.locator('.fun-projectile').count();
   log('tomato: picked once, one tap on the table throws it');
   log('cooldown: still picked, the seconds show, a tap meanwhile throws nothing');
@@ -231,6 +235,25 @@ try {
   assert(p.x >= 0 && p.x + p.width <= 568 && p.y >= 0, 'the picker fits a small screen');
   await beto.screenshot({ path: `${OUT}/fun-09-small-phone.png` });
   log('small phone: button off the table, picker fits');
+
+  // A big screen on your turn (the avatar grows and gets its ring): the button doesn't touch it.
+  for (const p of [ana, beto]) {
+    await p.setViewportSize({ width: 1600, height: 900 });
+    await p.keyboard.press('Escape');
+  }
+  await beto.waitForTimeout(600);
+  for (const p of [ana, beto]) {
+    const gap = await p.evaluate(() => {
+      const a = document.querySelector('.self-avatar .avatar').getBoundingClientRect();
+      const b = document.querySelector('.throw-btn').getBoundingClientRect();
+      return b.left - a.right;
+    });
+    assert(gap >= 8, `button clear of the avatar (${gap.toFixed(1)}px)`);
+  }
+  const av = await view(ana);
+  const anaTurn = av.game.turn === av.players.find((x) => x.id === av.youId).seat;
+  await (anaTurn ? ana : beto).screenshot({ path: `${OUT}/fun-10-desktop.png` });
+  log('desktop: the button sits clear of the avatar');
   log('ALL CHECKS PASSED');
 } finally {
   await browser.close();

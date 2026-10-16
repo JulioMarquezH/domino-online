@@ -87,6 +87,8 @@ export function Board({
         setInfo(tile && tile !== info ? tile : null);
       }}
     >
+      {/* Splats thrown at the table land on the felt, under the tiles. */}
+      <div className="board-stains" />
       <div className="snake-layer">
         {size.w > 0 &&
           layout.tiles.map((t) => {
