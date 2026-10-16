@@ -1,4 +1,4 @@
-import { cleanChatText, mulberry32 } from '@domino/shared';
+import { BIG_THROW_GAP_MS, cleanChatText, mulberry32 } from '@domino/shared';
 import { describe, expect, it } from 'vitest';
 import { Fun } from '../src/fun';
 import { RoomManager } from '../src/rooms';
@@ -54,8 +54,8 @@ describe('chat, reactions and throwables', () => {
     expect(fun.throw(room, a, 'bomb', { x: 0.5, y: 0.5 })).toMatchObject({ ok: true });
     const wait = fun.throw(room, b, 'tornado', { x: 0.5, y: 0.5 });
     expect(wait).toMatchObject({ ok: false, code: 'COOLDOWN' });
-    expect((wait as { retryInMs: number }).retryInMs).toBe(10_000);
-    clock.advance(10_000);
+    expect((wait as { retryInMs: number }).retryInMs).toBe(BIG_THROW_GAP_MS);
+    clock.advance(BIG_THROW_GAP_MS);
     expect(fun.throw(room, b, 'tornado', { x: 0.5, y: 0.5 })).toMatchObject({ ok: true });
     expect(fun.throw(room, a, 'piano', { x: 0.5, y: 0.5 })).toEqual({ ok: false, code: 'INVALID' });
     expect(fun.throw(room, a, 'tomato', { x: Number.NaN, y: 0.5 })).toEqual({

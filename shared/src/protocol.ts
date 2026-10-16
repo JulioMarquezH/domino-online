@@ -248,14 +248,14 @@ export type Throwable = (typeof THROWABLES)[number];
  * around) also give the whole table a breather: one of them every BIG_THROW_GAP_MS at most.
  */
 export const THROW_COOLDOWN_MS: Record<Throwable, number> = {
-  tomato: 8_000,
-  egg: 8_000,
-  quake: 25_000,
-  tornado: 40_000,
-  bomb: 40_000,
+  tomato: 3_000,
+  egg: 3_000,
+  quake: 10_000,
+  tornado: 15_000,
+  bomb: 15_000,
 };
 export const BIG_THROWS: readonly Throwable[] = ['bomb', 'tornado', 'quake'];
-export const BIG_THROW_GAP_MS = 10_000;
+export const BIG_THROW_GAP_MS = 6_000;
 
 export type FunEvent =
   | { id: number; kind: 'chat'; from: string; text: string; at: number }

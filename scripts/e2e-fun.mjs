@@ -139,21 +139,19 @@ try {
   assert((await ana.locator('.armed-hint').count()) === 0, 'no text banner when picking');
   // One tap on the felt throws it: Beto sees it fly from Ana's seat and the stain stay.
   await tap(ana, await onBoard(ana, 0.3, 0.4));
+  // It stays picked; while it recharges a tap throws nothing and the seconds show.
+  await btn(ana).locator('.throw-wait').waitFor({ timeout: 1000 });
+  assert(await btn(ana).evaluate((b) => b.classList.contains('armed')), 'tomato still picked');
+  await tap(ana, await onBoard(ana, 0.6, 0.4));
   await beto.locator('.fun-projectile').waitFor({ timeout: 3000 });
   await beto.waitForTimeout(300);
   await beto.screenshot({ path: `${OUT}/fun-03-tomato-flying.png` });
   await beto.locator('.stain-tomato').waitFor({ timeout: 3000 });
   await beto.waitForTimeout(400);
   await beto.screenshot({ path: `${OUT}/fun-04-tomato-splat.png` });
-  log('tomato: picked once, one tap on the table throws it');
-
-  // It stays picked; while it recharges a tap throws nothing and the seconds show.
-  assert(await btn(ana).evaluate((b) => b.classList.contains('armed')), 'tomato still picked');
-  assert(/^\d+$/.test(await btn(ana).locator('.throw-wait').innerText()), 'shows the wait');
+  assert((await beto.locator('.stain-tomato').count()) === 1, 'no second tomato while recharging');
   const flying = () => beto.locator('.fun-projectile').count();
-  await tap(ana, await onBoard(ana, 0.6, 0.4));
-  await beto.waitForTimeout(400);
-  assert((await flying()) === 0, 'no second tomato while recharging');
+  log('tomato: picked once, one tap on the table throws it');
   log('cooldown: still picked, the seconds show, a tap meanwhile throws nothing');
 
   // Egg at Beto: pick it, then a single tap on his avatar; it lands on his face.
@@ -190,6 +188,10 @@ try {
   await pick(beto, 'Bomba');
   await dragTo(beto, await onBoard(beto, 0.5, 0.5));
   await ana.locator('.big-boom').waitFor({ timeout: 3000 });
+  // The table's breather: right after a bomb nobody can throw a tornado.
+  await pick(ana, 'Tornado');
+  assert(await btn(ana).evaluate((b) => b.classList.contains('charging')), 'tornado waits');
+  log('breather: tornado waits after the bomb');
   await ana.waitForTimeout(250);
   await ana.screenshot({ path: `${OUT}/fun-06-bomb.png` });
   const moving = await knocked();
@@ -201,13 +203,8 @@ try {
   assert((await boxes()).join() === before.join(), 'every tile is back exactly where it was');
   log(`bomb: ${moving} tiles blown away, all back in place`);
 
-  // The table's breather: right after a bomb nobody can throw a tornado.
-  await pick(ana, 'Tornado');
-  assert(await btn(ana).evaluate((b) => b.classList.contains('charging')), 'tornado waits');
-  log('breather: tornado waits after the bomb');
-
   // Tornado dragged onto an AI's avatar (after the breather).
-  await ana.waitForTimeout(6500);
+  await ana.waitForTimeout(2500);
   await dragTo(ana, await center(ana.locator(`.table-screen [data-player-id="${bot.id}"]`)));
   await beto.locator('.big-tornado-sm').waitFor({ timeout: 3000 });
   await beto.waitForTimeout(700);
