@@ -7,32 +7,14 @@ import {
 } from '@domino/shared';
 import {
   useEffect,
-  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { arm, setTray, throwAt, useFun, waitFor, type ThrowTarget } from '../../net/fun';
+import { arm, throwAt, useFun, waitFor, type ThrowTarget } from '../../net/fun';
 import { THROW_ITEMS } from './items';
-
-/** 💣 in the controls: shows or hides the arsenal strip. */
-export function ArsenalButton() {
-  const { tray } = useFun();
-  return (
-    <button
-      type="button"
-      className={`icon-btn compact arsenal-btn ${tray ? 'is-on' : ''}`}
-      onClick={() => setTray(!tray)}
-      aria-pressed={tray}
-      aria-label={tray ? 'Ocultar el arsenal' : 'Mostrar el arsenal'}
-      title="Arsenal"
-    >
-      <span aria-hidden="true">💣</span>
-    </button>
-  );
-}
 
 /** What is under a screen point: another player's avatar, the table, or nothing. */
 function targetAt(x: number, y: number, selfId: string): ThrowTarget | null {
@@ -41,7 +23,7 @@ function targetAt(x: number, y: number, selfId: string): ThrowTarget | null {
     const id = avatar?.dataset.playerId;
     if (id && id !== selfId && avatar.closest('.table-screen')) return { to: id };
   }
-  const board = document.querySelector('.board')?.getBoundingClientRect();
+  const board = document.querySelector('.table-screen .board')?.getBoundingClientRect();
   if (board && x >= board.left && x <= board.right && y >= board.top && y <= board.bottom) {
     return { x: (x - board.left) / board.width, y: (y - board.top) / board.height };
   }
@@ -51,61 +33,18 @@ function targetAt(x: number, y: number, selfId: string): ThrowTarget | null {
 function markHover(target: ThrowTarget | null) {
   document.querySelectorAll('.throw-hover').forEach((el) => el.classList.remove('throw-hover'));
   if (!target) return;
-  if ('to' in target) {
-    document
-      .querySelector(`.table-screen [data-player-id="${target.to}"]`)
-      ?.classList.add('throw-hover');
-  } else {
-    document.querySelector('.board')?.classList.add('throw-hover');
-  }
+  const el =
+    'to' in target
+      ? document.querySelector(`.table-screen [data-player-id="${target.to}"]`)
+      : document.querySelector('.table-screen .board');
+  el?.classList.add('throw-hover');
 }
 
-const CORNERS = ['bl', 'br', 'tr', 'tl'] as const;
-type Corner = (typeof CORNERS)[number];
-const GAP = 10;
-
-/**
- * The corner of the table where the tray covers the fewest tiles (ends you can play on count
- * the most), so it never hides the game.
- */
-function freeCorner(tray: HTMLElement): Corner {
-  const rail = tray.offsetParent?.getBoundingClientRect();
-  if (!rail) return 'bl';
-  const w = tray.offsetWidth;
-  const h = tray.offsetHeight;
-  const things = [
-    ...[...document.querySelectorAll('.table-screen .board .board-tile')].map((el) => ({
-      r: el.getBoundingClientRect(),
-      weight: 1,
-    })),
-    ...[...document.querySelectorAll('.table-screen .board [data-end-target]')].map((el) => ({
-      r: el.getBoundingClientRect(),
-      weight: 10,
-    })),
-  ];
-  let best: Corner = 'bl';
-  let bestCost = Infinity;
-  for (const c of CORNERS) {
-    const left = c.endsWith('l') ? rail.left + GAP : rail.right - GAP - w;
-    const top = c.startsWith('t') ? rail.top + GAP : rail.bottom - GAP - h;
-    const cost = things.reduce(
-      (sum, { r, weight }) =>
-        r.right > left && r.left < left + w && r.bottom > top && r.top < top + h
-          ? sum + weight
-          : sum,
-      0,
-    );
-    if (cost < bestCost) {
-      bestCost = cost;
-      best = c;
-    }
-    if (cost === 0) break;
-  }
-  return best;
-}
+/** The full wait of an item, for the recharge ring. */
+const fullWait = (t: Throwable) =>
+  Math.max(THROW_COOLDOWN_MS[t], BIG_THROWS.includes(t) ? BIG_THROW_GAP_MS : 0);
 
 interface Drag {
-  item: Throwable;
   pointerId: number;
   sx: number;
   sy: number;
@@ -115,69 +54,85 @@ interface Drag {
 }
 
 /**
- * The arsenal strip at a corner of the table. One gesture: drag a thing onto a player or any
- * point of the table and let go. Or tap it, then tap where it goes.
+ * One small button next to your avatar with the thing you picked. Once picked it stays: every
+ * tap on another player or the table throws it. Tap the button to pick another (or none), or
+ * drag it straight onto a target.
  */
-export function ThrowTray({ selfId }: { selfId: string }) {
-  const { tray, armed } = useFun();
+export function ThrowButton({ selfId }: { selfId: string }) {
+  const { armed } = useFun();
   const [now, setNow] = useState(() => performance.now());
+  // Where the picker opens (the button's box), or null when closed.
+  const [picking, setPicking] = useState<DOMRect | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
+  const [nudge, setNudge] = useState(0);
   const dragRef = useRef<Drag | null>(null);
-  const trayRef = useRef<HTMLDivElement>(null);
-  const [corner, setCorner] = useState<Corner>('bl');
+  const btn = useRef<HTMLButtonElement>(null);
 
-  // Moves out of the way whenever the tiles on the table change (or the screen does).
-  useLayoutEffect(() => {
-    const tray = trayRef.current;
-    const board = document.querySelector('.table-screen .board');
-    if (!tray || !board) return;
-    let frame = 0;
-    const update = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => setCorner(freeCorner(tray)));
-    };
-    update();
-    const mo = new MutationObserver(update);
-    mo.observe(board, { childList: true, subtree: true });
-    window.addEventListener('resize', update);
-    return () => {
-      cancelAnimationFrame(frame);
-      mo.disconnect();
-      window.removeEventListener('resize', update);
-    };
-  }, [tray]);
-
-  // Recharge rings tick only while something is recharging.
-  const anyWaiting = THROWABLES.some((t) => waitFor(t, now) > 0);
+  const wait = armed ? waitFor(armed, now) : 0;
+  const charging = wait > 0;
+  // The ring ticks only while the picked thing is recharging.
   useEffect(() => {
-    if (!tray) return;
-    const id = setInterval(() => setNow(performance.now()), anyWaiting ? 250 : 1000);
+    if (!charging) return;
+    const id = setInterval(() => setNow(performance.now()), 250);
     return () => clearInterval(id);
-  }, [tray, anyWaiting]);
+  }, [charging]);
 
-  // Armed by a tap: the next tap on a player or the table throws it (and nothing else happens).
+  // With something picked, a tap on another player or on the table throws it. Taps that play
+  // a tile (the end targets, or the table while a tile of yours is picked) are left alone.
   useEffect(() => {
-    if (!armed) return;
+    if (!armed || picking) return;
     const onClick = (e: MouseEvent) => {
       const el = e.target as HTMLElement;
-      if (el.closest('.throw-tray')) return;
+      // Only what was tapped itself counts: never through the chat, the summary or a menu.
+      if (!el.closest('.table-screen [data-player-id], .table-screen .board')) return;
+      if (el.closest('[data-end-target]')) return;
+      const target = targetAt(e.clientX, e.clientY, selfId);
+      if (!target) return;
+      if ('x' in target && document.querySelector('.table-screen .board [data-end-target]')) {
+        return;
+      }
       e.preventDefault();
       e.stopPropagation();
-      const target = targetAt(e.clientX, e.clientY, selfId);
-      if (target) void throwAt(armed, target);
-      else arm(null);
+      if (waitFor(armed) > 0) {
+        setNow(performance.now());
+        setNudge((n) => n + 1);
+        return;
+      }
+      void throwAt(armed, target).then(() => setNow(performance.now()));
     };
     window.addEventListener('click', onClick, true);
     return () => window.removeEventListener('click', onClick, true);
-  }, [armed, selfId]);
+  }, [armed, picking, selfId]);
 
-  if (!tray) return null;
+  // The picker closes with a tap anywhere else.
+  useEffect(() => {
+    if (!picking) return;
+    const close = (e: PointerEvent) => {
+      const el = e.target as HTMLElement;
+      if (!el.closest('.throw-picker, .throw-btn')) setPicking(null);
+    };
+    window.addEventListener('pointerdown', close, true);
+    return () => window.removeEventListener('pointerdown', close, true);
+  }, [picking]);
 
-  const onDown = (e: ReactPointerEvent<HTMLButtonElement>, item: Throwable) => {
-    if (waitFor(item) > 0) return;
+  // Shakes the button when you tap while it is still recharging.
+  useEffect(() => {
+    if (nudge)
+      btn.current?.animate(
+        [
+          { rotate: '0deg' },
+          { rotate: '-14deg' },
+          { rotate: '12deg' },
+          { rotate: '-6deg' },
+          { rotate: '0deg' },
+        ],
+        { duration: 360 },
+      );
+  }, [nudge]);
+
+  const onDown = (e: ReactPointerEvent<HTMLButtonElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId);
     const d = {
-      item,
       pointerId: e.pointerId,
       sx: e.clientX,
       sy: e.clientY,
@@ -195,7 +150,7 @@ export function ThrowTray({ selfId }: { selfId: string }) {
     const next = { ...d, x: e.clientX, y: e.clientY, moved };
     dragRef.current = next;
     setDrag(next);
-    if (moved) markHover(targetAt(e.clientX, e.clientY, selfId));
+    if (moved && armed) markHover(targetAt(e.clientX, e.clientY, selfId));
   };
   const onUp = (e: ReactPointerEvent<HTMLButtonElement>, cancelled = false) => {
     const d = dragRef.current;
@@ -204,59 +159,102 @@ export function ThrowTray({ selfId }: { selfId: string }) {
     setDrag(null);
     markHover(null);
     if (cancelled) return;
-    if (!d.moved) {
-      arm(armed === d.item ? null : d.item);
+    if (!d.moved || !armed) {
+      const box = e.currentTarget.getBoundingClientRect();
+      setPicking((p) => (p ? null : box));
       return;
     }
     const target = targetAt(e.clientX, e.clientY, selfId);
-    if (target) void throwAt(d.item, target);
+    if (!target) return;
+    if (waitFor(armed) > 0) {
+      setNudge((n) => n + 1);
+      return;
+    }
+    void throwAt(armed, target).then(() => setNow(performance.now()));
   };
 
+  const pick = (t: Throwable | null, at: number) => {
+    arm(t);
+    setNow(at);
+    setPicking(null);
+  };
+
+  const r = picking;
+  const label = armed
+    ? `${THROW_ITEMS[armed].label} listo para lanzar${wait > 0 ? `, en ${Math.ceil(wait / 1000)} s` : ''}. Cambiar`
+    : 'Elegir algo para lanzar';
+
   return (
-    <div
-      ref={trayRef}
-      className={`throw-tray at-${corner}`}
-      role="toolbar"
-      aria-label="Arsenal: arrastra a un jugador o a la mesa"
-    >
-      {THROWABLES.map((t) => {
-        const wait = waitFor(t, now);
-        const full = Math.max(THROW_COOLDOWN_MS[t], BIG_THROWS.includes(t) ? BIG_THROW_GAP_MS : 0);
-        return (
-          <button
-            key={t}
-            type="button"
-            className={`tray-item ${armed === t ? 'armed' : ''} ${wait > 0 ? 'charging' : ''}`}
-            style={{ '--left': `${Math.min(1, wait / Math.max(full, wait, 1))}` } as CSSProperties}
-            aria-label={`${THROW_ITEMS[t].label}${wait > 0 ? `, listo en ${Math.ceil(wait / 1000)} s` : ''}`}
-            title={THROW_ITEMS[t].label}
-            disabled={wait > 0}
-            onPointerDown={(e) => onDown(e, t)}
-            onPointerMove={onMove}
-            onPointerUp={(e) => onUp(e)}
-            onPointerCancel={(e) => onUp(e, true)}
-            onContextMenu={(e) => e.preventDefault()}
-          >
-            <span className="tray-emoji">{THROW_ITEMS[t].emoji}</span>
-            {wait > 0 && <span className="tray-wait">{Math.ceil(wait / 1000)}</span>}
-          </button>
-        );
-      })}
-      {armed && (
-        <div className="armed-hint" role="status">
-          <span>Toca a un jugador o la mesa</span>
-          <button type="button" className="btn ghost small" onClick={() => arm(null)}>
-            Cancelar
-          </button>
-        </div>
-      )}
-      {drag?.moved &&
+    <>
+      <button
+        ref={btn}
+        type="button"
+        className={`throw-btn ${armed ? 'armed' : ''} ${wait > 0 ? 'charging' : ''}`}
+        style={
+          armed
+            ? ({ '--left': `${Math.min(1, wait / fullWait(armed))}` } as CSSProperties)
+            : undefined
+        }
+        aria-label={label}
+        aria-expanded={picking !== null}
+        title={label}
+        onPointerDown={onDown}
+        onPointerMove={onMove}
+        onPointerUp={(e) => onUp(e)}
+        onPointerCancel={(e) => onUp(e, true)}
+        onContextMenu={(e) => e.preventDefault()}
+      >
+        <span className="throw-emoji">{armed ? THROW_ITEMS[armed].emoji : '🎯'}</span>
+        {wait > 0 && <span className="throw-wait">{Math.ceil(wait / 1000)}</span>}
+      </button>
+      {r &&
         createPortal(
-          <div className="throw-ghost" style={{ left: drag.x, top: drag.y }}>
-            {THROW_ITEMS[drag.item].emoji}
+          <div
+            className="throw-picker"
+            role="menu"
+            aria-label="¿Qué lanzas?"
+            style={{ left: Math.max(8, r.left - 4), bottom: innerHeight - r.top + 8 }}
+          >
+            {THROWABLES.map((t) => {
+              const w = waitFor(t, now);
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={armed === t}
+                  className={`picker-item ${armed === t ? 'armed' : ''} ${w > 0 ? 'charging' : ''}`}
+                  style={{ '--left': `${Math.min(1, w / fullWait(t))}` } as CSSProperties}
+                  title={`${THROW_ITEMS[t].label}: ${THROW_ITEMS[t].does}`}
+                  aria-label={THROW_ITEMS[t].label}
+                  onClick={(e) => pick(t, e.timeStamp)}
+                >
+                  <span className="throw-emoji">{THROW_ITEMS[t].emoji}</span>
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              role="menuitemradio"
+              aria-checked={armed === null}
+              className={`picker-item picker-none ${armed === null ? 'armed' : ''}`}
+              title="Nada: los toques vuelven a ser normales"
+              aria-label="Nada"
+              onClick={(e) => pick(null, e.timeStamp)}
+            >
+              ✕
+            </button>
           </div>,
           document.body,
         )}
-    </div>
+      {drag?.moved &&
+        armed &&
+        createPortal(
+          <div className="throw-ghost" style={{ left: drag.x, top: drag.y }}>
+            {THROW_ITEMS[armed].emoji}
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }

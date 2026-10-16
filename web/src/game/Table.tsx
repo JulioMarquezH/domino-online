@@ -27,7 +27,7 @@ import { Seat } from './Seat';
 import { ChatButton } from './fun/ChatButton';
 import { ChatPanel } from './fun/ChatPanel';
 import { FunLayer } from './fun/FunLayer';
-import { ArsenalButton, ThrowTray } from './fun/Arsenal';
+import { ThrowButton } from './fun/Arsenal';
 import { useFun } from '../net/fun';
 
 export function Table({ view }: { view: RoomView }) {
@@ -225,7 +225,6 @@ export function Table({ view }: { view: RoomView }) {
               positionOf={d.position}
             />
             <Announcer message={announcement} />
-            <ThrowTray selfId={view.youId} />
             {turnPos && !myTurn && (
               <div
                 className={`turn-badge at-${turnPos} ${myTurn ? 'mine' : ''}`}
@@ -256,7 +255,12 @@ export function Table({ view }: { view: RoomView }) {
         </div>
         <div className="cell c-bottom-left">
           <div className={`self-seat ${myTurn ? 'is-turn' : ''}`}>
-            {d.me && <Avatar player={d.me} team={d.myTeam} isSelf active={myTurn} />}
+            {d.me && (
+              <div className="self-avatar">
+                <Avatar player={d.me} team={d.myTeam} isSelf active={myTurn} />
+                <ThrowButton selfId={view.youId} />
+              </div>
+            )}
             <span className="self-label">{myTurn ? '¡Te toca!' : 'Tú'}</span>
           </div>
         </div>
@@ -317,7 +321,6 @@ function TableControls() {
   return (
     <div className="table-controls">
       <FullscreenButton />
-      <ArsenalButton />
       <ChatButton />
       <SelfMicButton compact />
       <button

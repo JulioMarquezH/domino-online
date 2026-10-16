@@ -2,6 +2,7 @@ import {
   BIG_THROWS,
   BIG_THROW_GAP_MS,
   THROW_COOLDOWN_MS,
+  isThrowable,
   type FunEvent,
   type Throwable,
 } from '@domino/shared';
@@ -14,22 +15,22 @@ interface FunState {
   chat: Extract<FunEvent, { kind: 'chat' }>[];
   unread: number;
   open: boolean;
-  /** The thing you picked from the arsenal: your next tap on the table throws it. */
+  /** The thing you picked from the arsenal: every tap on a player or the table throws it,
+   * until you pick another one or none (remembered on this device). */
   armed: Throwable | null;
   /** performance.now() until which each thing is still recharging. */
   ready: Partial<Record<Throwable, number>>;
   /** Until when the table rests from bombs, tornados and quakes. */
   bigReady: number;
-  /** The arsenal strip is on screen (remembered on this device). */
-  tray: boolean;
 }
 
-const TRAY_KEY = 'domino:arsenal';
-function readTray(): boolean {
+const ARMED_KEY = 'domino:armed';
+function readArmed(): Throwable | null {
   try {
-    return localStorage.getItem(TRAY_KEY) !== 'off';
+    const v = localStorage.getItem(ARMED_KEY);
+    return v && isThrowable(v) ? v : null;
   } catch {
-    return true;
+    return null;
   }
 }
 
@@ -38,10 +39,9 @@ let state: FunState = {
   chat: [],
   unread: 0,
   open: false,
-  armed: null,
+  armed: readArmed(),
   ready: {},
   bigReady: 0,
-  tray: readTray(),
 };
 const listeners = new Set<() => void>();
 const animators = new Set<(e: FunEvent) => void>();
@@ -75,7 +75,7 @@ function currentRoom(): string | null {
 function forRoom(): void {
   const roomId = currentRoom();
   if (roomId !== state.roomId) {
-    set({ roomId, chat: [], unread: 0, open: false, armed: null, ready: {}, bigReady: 0 });
+    set({ roomId, chat: [], unread: 0, open: false, ready: {}, bigReady: 0 });
   }
 }
 
@@ -86,16 +86,13 @@ export function setChatOpen(open: boolean): void {
 export const sendChat = (text: string) => emitAck('room:chat', { text });
 export const sendReaction = (emoji: string) => emitAck('room:react', { emoji });
 export function arm(item: Throwable | null): void {
-  set({ armed: item });
-}
-
-export function setTray(on: boolean): void {
   try {
-    localStorage.setItem(TRAY_KEY, on ? 'on' : 'off');
+    if (item) localStorage.setItem(ARMED_KEY, item);
+    else localStorage.removeItem(ARMED_KEY);
   } catch {
-    // storage blocked: still toggles for this visit
+    // storage blocked: still picked for this visit
   }
-  set({ tray: on, armed: on ? state.armed : null });
+  set({ armed: item });
 }
 
 export type ThrowTarget = { to: string } | { x: number; y: number };
@@ -109,7 +106,6 @@ export function waitFor(item: Throwable, now = performance.now()): number {
 
 /** Throws something at a player or a point of the table (x, y in 0..1 of the board). */
 export async function throwAt(item: Throwable, target: ThrowTarget): Promise<void> {
-  set({ armed: null });
   const res = await emitAck('room:throw', { item, ...target });
   const now = performance.now();
   if (res.ok) {

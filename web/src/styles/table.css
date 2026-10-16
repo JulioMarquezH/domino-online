@@ -2055,82 +2055,48 @@
 }
 
 /* ───────────── arsenal: things thrown at the table or at a player ───────────── */
-.arsenal-btn span {
-  font-size: 1.1rem;
-  line-height: 1;
-}
-
-.arsenal-btn.is-on {
-  border-color: var(--brass-hi);
-}
-
-.throw-tray {
-  --gap: 10px;
-  position: absolute;
-  z-index: 8;
-  display: flex;
-  gap: 4px;
-  padding: 4px;
-  border-radius: 14px;
-  background: rgba(3, 12, 9, 0.62);
-  border: 1px solid rgba(217, 176, 100, 0.25);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
-}
-
-.throw-tray.at-bl,
-.throw-tray.at-tl {
-  left: var(--gap);
-}
-
-.throw-tray.at-br,
-.throw-tray.at-tr {
-  right: var(--gap);
-}
-
-.throw-tray.at-bl,
-.throw-tray.at-br {
-  bottom: var(--gap);
-}
-
-.throw-tray.at-tl,
-.throw-tray.at-tr {
-  top: var(--gap);
-}
-
-.tray-item {
-  --left: 0;
+.self-avatar {
   position: relative;
-  width: clamp(34px, 11dvh, 44px);
+}
+
+/* The picked thing, hanging off the right of your avatar (outside the table). */
+.throw-btn {
+  --left: 0;
+  position: absolute;
+  left: calc(100% + 6px);
+  top: 50%;
+  translate: 0 -50%;
+  width: clamp(30px, 9dvh, 40px);
   aspect-ratio: 1;
   padding: 0;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(245, 237, 219, 0.12);
-  border-radius: 11px;
-  background: rgba(255, 244, 214, 0.06);
+  border-radius: 50%;
+  border: 1px dashed rgba(245, 237, 219, 0.35);
+  background: rgba(3, 12, 9, 0.55);
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
-  transition: transform 0.12s;
 }
 
-.tray-item:active:not(:disabled) {
-  transform: scale(0.9);
+.throw-btn.armed {
+  border: 2px solid var(--brass-hi);
+  background: rgba(243, 217, 151, 0.18);
+  box-shadow: 0 0 12px rgba(243, 217, 151, 0.45);
 }
 
-.tray-item.armed {
-  border-color: var(--brass-hi);
-  background: rgba(243, 217, 151, 0.22);
-  box-shadow: 0 0 14px rgba(243, 217, 151, 0.5);
-}
-
-.tray-emoji {
-  font-size: clamp(18px, 6dvh, 24px);
+.throw-emoji {
+  font-size: clamp(16px, 5.4dvh, 22px);
   line-height: 1;
 }
 
+.throw-btn:not(.armed) .throw-emoji {
+  opacity: 0.7;
+}
+
 /* Recharging: a dark sweep that shrinks as the wait runs out. */
-.tray-item.charging::before {
+.throw-btn.charging::before,
+.picker-item.charging::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -2138,17 +2104,44 @@
   background: conic-gradient(rgba(0, 0, 0, 0.62) calc(var(--left) * 360deg), transparent 0);
 }
 
-.tray-item:disabled .tray-emoji {
-  filter: grayscale(0.7);
-  opacity: 0.6;
-}
-
-.tray-wait {
+.throw-wait {
   position: absolute;
   font-size: 0.72rem;
   font-weight: 800;
   color: #fff;
   text-shadow: 0 1px 2px #000;
+}
+
+.throw-picker {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 14px;
+  background: rgba(3, 12, 9, 0.9);
+  border: 1px solid rgba(217, 176, 100, 0.35);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
+}
+
+.picker-item {
+  --left: 0;
+  position: relative;
+  width: clamp(34px, 10dvh, 42px);
+  aspect-ratio: 1;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  border: 1px solid rgba(245, 237, 219, 0.12);
+  background: rgba(255, 244, 214, 0.06);
+  color: var(--ink-2);
+  font-size: 1rem;
+}
+
+.picker-item.armed {
+  border-color: var(--brass-hi);
+  background: rgba(243, 217, 151, 0.22);
 }
 
 .throw-ghost {
@@ -2161,7 +2154,6 @@
   filter: drop-shadow(0 10px 10px rgba(0, 0, 0, 0.5));
 }
 
-.throw-hover.avatar,
 [data-player-id].throw-hover {
   outline: 3px solid #ff6b4a;
   outline-offset: 4px;
@@ -2171,42 +2163,6 @@
   box-shadow:
     inset 0 0 0 3px rgba(255, 107, 74, 0.7),
     inset 0 8px 24px rgba(0, 0, 0, 0.55);
-}
-
-.armed-hint {
-  position: absolute;
-  left: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 4px 3px 12px;
-  border-radius: 999px;
-  font-size: 0.8rem;
-  white-space: nowrap;
-  color: #1b1307;
-  background: linear-gradient(180deg, var(--brass-hi), var(--brass));
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
-}
-
-.throw-tray.at-br .armed-hint,
-.throw-tray.at-tr .armed-hint {
-  left: auto;
-  right: 0;
-}
-
-.throw-tray.at-bl .armed-hint,
-.throw-tray.at-br .armed-hint {
-  bottom: calc(100% + 6px);
-}
-
-.throw-tray.at-tl .armed-hint,
-.throw-tray.at-tr .armed-hint {
-  top: calc(100% + 6px);
-}
-
-.armed-hint .btn {
-  min-height: 26px;
-  color: #1b1307;
 }
 
 .fun-shadow,
@@ -2321,12 +2277,4 @@
 
 .big-tornado-sm {
   font-size: clamp(44px, 14dvh, 70px);
-}
-
-@media (max-height: 430px) {
-  .throw-tray {
-    --gap: 6px;
-    padding: 3px;
-    gap: 3px;
-  }
 }
