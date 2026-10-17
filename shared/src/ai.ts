@@ -8,7 +8,6 @@
  * all four seats, and picks the move with the best average result for its team.
  */
 import {
-  applyHandAction,
   hasLegalMove,
   legalMoves,
   openEnds,
@@ -19,7 +18,7 @@ import {
   type PlacedTile,
 } from './hand';
 import { shuffle, type Rng } from './rng';
-import { SEATS, partnerOf, teamOf, type Seat } from './seats';
+import { SEATS, nextSeat, partnerOf, teamOf, type Seat } from './seats';
 import { fullSet, hasPip, isDouble, parseTile, pipSum, type TileId } from './tiles';
 
 /** Everything a player legitimately knows at its turn. */
@@ -152,36 +151,107 @@ function heuristic(move: LegalMove, hand: TileId[], line: PlacedTile[]): number 
   return score;
 }
 
-/** Playout policy: heuristic with a bit of noise so simulations explore. */
-function policyMove(hand: TileId[], line: PlacedTile[], rng: Rng): LegalMove | null {
-  const moves = legalMoves(hand, line);
-  if (moves.length === 0) return null;
-  if (hand.length === 1) return moves[0] as LegalMove;
-  let best = moves[0] as LegalMove;
-  let bestScore = -Infinity;
-  for (const m of moves) {
-    const s = heuristic(m, hand, line) + rng() * 2.5;
-    if (s > bestScore) {
-      bestScore = s;
-      best = m;
-    }
+/**
+ * The playouts run on plain numbers and mutate their own copy of the hands: the same rules,
+ * policy and random draws as playing it with `applyHandAction`, without copying the whole hand
+ * state at every move (thousands of playouts per decision).
+ */
+type Pair = readonly [number, number];
+const PAIRS = new Map<TileId, Pair>(fullSet().map((t) => [t, parseTile(t)]));
+const pairOf = (t: TileId) => PAIRS.get(t) as Pair;
+
+const fits = (t: Pair, n: number) => t[0] === n || t[1] === n;
+const BOTH_ENDS = [true, false] as const;
+
+/** `heuristic()` for a tile already on numbers, with the table's open ends known. */
+function quickHeuristic(hand: Pair[], i: number, left: boolean, l: number, r: number): number {
+  const [a, b] = hand[i] as Pair;
+  let score = (a + b) * 0.6;
+  if (a === b) score += 4;
+  const newEnd = left ? (a === l ? b : a) : a === r ? b : a;
+  let follow = 0;
+  let keepsA = false;
+  let keepsB = false;
+  for (let j = 0; j < hand.length; j++) {
+    if (j === i) continue;
+    const t = hand[j] as Pair;
+    if (fits(t, newEnd)) follow++;
+    if (fits(t, a)) keepsA = true;
+    if (fits(t, b)) keepsB = true;
   }
-  return best;
+  score += follow * 1.5;
+  if (!keepsA) score -= 0.8;
+  if (a !== b && !keepsB) score -= 0.8;
+  return score;
 }
 
-/** Plays the hand to the end; returns the result from `team`'s point of view. */
-function playout(state: HandState, team: 0 | 1, rng: Rng): number {
-  let s = state;
-  for (let guard = 0; guard < 120 && !s.result; guard++) {
-    const hand = s.hands[s.turn] ?? [];
-    const m = policyMove(hand, s.line, rng);
-    const out = applyHandAction(s, s.turn, m ? { type: 'play', ...m } : { type: 'pass' });
-    if (!out.ok) return 0;
-    s = out.state;
+const pips = (h: Pair[]) => h.reduce((s, t) => s + t[0] + t[1], 0);
+
+/** The hand's result from `team`'s point of view once it is over, or null while it goes on. */
+function quickResult(
+  hands: Pair[][],
+  mover: Seat,
+  l: number,
+  r: number,
+  team: 0 | 1,
+): number | null {
+  const tp: [number, number] = [0, 0];
+  if ((hands[mover] as Pair[]).length === 0) {
+    SEATS.forEach((s) => (tp[teamOf(s)] += pips(hands[s] as Pair[])));
+    const winner = teamOf(mover);
+    const points = tp[winner === 0 ? 1 : 0];
+    return winner === team ? points : -points;
   }
-  const r = s.result;
-  if (!r || r.winnerTeam === null) return 0;
-  return r.winnerTeam === team ? r.points : -r.points;
+  if (hands.some((h) => h.some((t) => fits(t, l) || fits(t, r)))) return null;
+  SEATS.forEach((s) => (tp[teamOf(s)] += pips(hands[s] as Pair[])));
+  if (tp[0] === tp[1]) return 0;
+  const winner = tp[0] < tp[1] ? 0 : 1;
+  const points = tp[winner === 0 ? 1 : 0];
+  return winner === team ? points : -points;
+}
+
+/**
+ * Plays the hand to the end; returns the result from `team`'s point of view. Playout policy:
+ * the heuristic with a bit of noise so simulations explore.
+ */
+function playout(hands: Pair[][], l: number, r: number, turn: Seat, team: 0 | 1, rng: Rng): number {
+  let s = turn;
+  for (let guard = 0; guard < 120; guard++) {
+    const hand = hands[s] as Pair[];
+    let bestI = -1;
+    let bestLeft = true;
+    let bestScore = -Infinity;
+    // Same order as legalMoves(): each tile, its left end first.
+    for (let i = 0; i < hand.length; i++) {
+      const t = hand[i] as Pair;
+      for (const left of BOTH_ENDS) {
+        if (!fits(t, left ? l : r)) continue;
+        if (hand.length === 1) {
+          if (bestI < 0) {
+            bestI = i;
+            bestLeft = left;
+          }
+          continue;
+        }
+        const score = quickHeuristic(hand, i, left, l, r) + rng() * 2.5;
+        if (score > bestScore) {
+          bestScore = score;
+          bestI = i;
+          bestLeft = left;
+        }
+      }
+    }
+    if (bestI >= 0) {
+      const [a, b] = hand[bestI] as Pair;
+      if (bestLeft) l = a === l ? b : a;
+      else r = a === r ? b : a;
+      hand.splice(bestI, 1);
+      const result = quickResult(hands, s, l, r, team);
+      if (result !== null) return result;
+    }
+    s = nextSeat(s);
+  }
+  return 0;
 }
 
 /** Picks the action for the player described by `k`. */
@@ -200,21 +270,24 @@ export function chooseAction(k: Knowledge, rng: Rng, options: AiOptions = {}): A
   const voids = knownVoids(k.history);
   const totals = candidates.map(() => 0);
 
+  const ends = openEnds(k.line);
   for (let i = 0; i < samples; i++) {
-    const hands = sampleHands(k, rng, voids);
-    const world: HandState = {
-      hands,
-      line: k.line,
-      origin: k.origin,
-      starter: k.starter,
-      turn: k.seat,
-      result: null,
-      history: k.history,
-    };
+    const dealt = sampleHands(k, rng, voids).map((h) => h.map(pairOf));
     candidates.forEach((m, j) => {
-      const out = applyHandAction(world, k.seat, { type: 'play', ...m });
-      if (!out.ok) return;
-      totals[j] = (totals[j] ?? 0) + playout(out.state, team, rng);
+      const hands = dealt.map((h) => h.slice());
+      const mine = hands[k.seat] as Pair[];
+      const at = mine.findIndex((t) => t === pairOf(m.tile));
+      const [a, b] = mine[at] as Pair;
+      mine.splice(at, 1);
+      // Where the candidate leaves the ends (on the lead, the tile itself is both ends).
+      let l = a;
+      let r = b;
+      if (ends) {
+        l = m.end === 'left' ? (a === ends[0] ? b : a) : ends[0];
+        r = m.end === 'right' ? (a === ends[1] ? b : a) : ends[1];
+      }
+      const over = quickResult(hands, k.seat, l, r, team);
+      totals[j] = (totals[j] ?? 0) + (over ?? playout(hands, l, r, nextSeat(k.seat), team, rng));
     });
   }
 

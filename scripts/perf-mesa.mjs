@@ -61,6 +61,22 @@ for (let i = 0; i < 200; i++) {
 }
 await page.waitForTimeout(1500);
 
+// Which elements change while nothing happens (attribute/class/text changes cause repaints).
+await page.evaluate(() => {
+  window.__muts = {};
+  new MutationObserver((list) => {
+    for (const m of list) {
+      const el = m.target.nodeType === 1 ? m.target : m.target.parentElement;
+      const key = `${m.type}:${m.attributeName ?? ''} on ${el?.className?.baseVal ?? el?.className ?? el?.tagName}`;
+      window.__muts[key] = (window.__muts[key] ?? 0) + 1;
+    }
+  }).observe(document.body, {
+    subtree: true,
+    attributes: true,
+    childList: true,
+    characterData: true,
+  });
+});
 const cdp = await ctx.newCDPSession(page);
 await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
 await cdp.send('Performance.enable');
@@ -96,5 +112,16 @@ const result = {
   domNodes: after.Nodes,
 };
 console.log(JSON.stringify(result));
+// What keeps animating while nothing happens (each one costs paints on a phone).
+const running = await page.evaluate(() =>
+  document.getAnimations().map((a) => {
+    const el = a.effect?.target;
+    const name = a.animationName ?? a.transitionProperty ?? a.constructor.name;
+    const t = a.effect?.getTiming();
+    return `${name} on ${el?.className?.baseVal ?? el?.className ?? el?.tagName} (${t?.iterations === Infinity ? 'infinite' : t?.iterations + 'x'})`;
+  }),
+);
+console.log('changes while idle:', JSON.stringify(await page.evaluate(() => window.__muts)));
+console.log('running animations:', running.length ? running.join(' | ') : 'none');
 await page.screenshot({ path: `e2e-artifacts/perf-${label}.png` });
 await browser.close();

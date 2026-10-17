@@ -18,13 +18,19 @@ export function isTileId(value: unknown): value is TileId {
   return m !== null && Number(m[1]) >= Number(m[2]);
 }
 
+// Parsed once per tile: the AI asks for these numbers millions of times.
+const PARSED = new Map<TileId, readonly [number, number]>();
+
 /** Returns [hi, lo]. */
 export function parseTile(id: TileId): [number, number] {
+  const hit = PARSED.get(id);
+  if (hit) return [hit[0], hit[1]];
   const m = TILE_RE.exec(id);
   if (!m) throw new Error(`Invalid tile id: ${id}`);
   const hi = Number(m[1]);
   const lo = Number(m[2]);
   if (hi < lo) throw new Error(`Invalid tile id (not normalized): ${id}`);
+  PARSED.set(id, [hi, lo]);
   return [hi, lo];
 }
 
